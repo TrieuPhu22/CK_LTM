@@ -230,12 +230,52 @@ class SoccerApp(tk.Tk):
             messagebox.showerror("Lỗi", f"Không thể tải bảng xếp hạng: {str(e)}")
 
     def load_scorers(self):
-        comp = COMPETITIONS[self.comp_combo.get()]
-        self.client.sendall(f"scorers {comp}".encode(FORMAT))
-        data = self.safe_recv()
-        self.tree_scorers.delete(*self.tree_scorers.get_children())
-        for s in data.get("scorers", []):
-            self.tree_scorers.insert("", "end", values=(s["player"]["name"], s["team"]["name"], s["goals"]))
+        try:
+            comp = COMPETITIONS[self.comp_combo.get()]
+            self.client.sendall(f"scorers {comp}".encode(FORMAT))
+            data = self.safe_recv()
+
+            self.tree_scorers.delete(*self.tree_scorers.get_children())
+
+            if not data.get("scorers"):
+                self.tree_scorers.insert("", "end", values=("Không có dữ liệu", "", ""))
+                return
+
+            # Mở rộng cột để hiển thị thêm thông tin
+            if len(self.tree_scorers["columns"]) == 3:
+                self.tree_scorers["columns"] = ("player", "team", "position", "nationality", "goals", "assists")
+                for col in self.tree_scorers["columns"]:
+                    self.tree_scorers.heading(col, text=col.upper())
+
+            for idx, s in enumerate(data.get("scorers", []), 1):
+                # Lấy thông tin bổ sung nếu có
+                position = s["player"].get("position", "N/A")
+                nationality = s["player"].get("nationality", "N/A")
+                assists = s.get("assists", "N/A")
+
+                # Hiển thị thông tin
+                self.tree_scorers.insert(
+                    "", "end",
+                    values=(
+                        s["player"]["name"],
+                        s["team"]["name"],
+                        position,
+                        nationality,
+                        s["goals"],
+                        assists
+                    )
+                )
+
+                # Lưu ID cầu thủ để sử dụng sau này
+                self.players[s["player"]["name"]] = s["player"]["id"]
+                self.teams[s["team"]["name"]] = s["team"]["id"]
+
+            # Cập nhật danh sách cầu thủ cho tab Player Info
+            self.player_combo["values"] = list(self.players.keys())
+            self.team_combo["values"] = list(self.teams.keys())
+
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể tải danh sách ghi bàn: {str(e)}")
 
     def load_team(self):
         team_name = self.team_combo.get()
