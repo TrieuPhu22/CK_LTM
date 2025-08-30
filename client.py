@@ -278,23 +278,58 @@ class SoccerApp(tk.Tk):
             messagebox.showerror("Lỗi", f"Không thể tải danh sách ghi bàn: {str(e)}")
 
     def load_team(self):
-        team_name = self.team_combo.get()
-        if not team_name:
-            messagebox.showerror("Error", "Please select a team")
-            return
-        team_id = self.teams[team_name]
-        self.client.sendall(f"team {team_id}".encode(FORMAT))
-        data = self.safe_recv()
+        try:
+            team_name = self.team_combo.get()
+            if not team_name:
+                messagebox.showerror("Lỗi", "Vui lòng chọn một đội")
+                return
 
-        self.team_text.delete("1.0", tk.END)
-        self.team_text.insert("end", json.dumps(data, indent=2))
+            team_id = self.teams[team_name]
+            self.client.sendall(f"team {team_id}".encode(FORMAT))
+            data = self.safe_recv()
 
-        # Cập nhật danh sách cầu thủ
-        self.players.clear()
-        squad = data.get("squad", [])
-        for p in squad:
-            self.players[p["name"]] = p["id"]
-        self.player_combo["values"] = list(self.players.keys())
+            # Xóa thông tin cũ
+            self.team_text.delete("1.0", tk.END)
+
+            if not data or "errorCode" in data:
+                self.team_text.insert("end", "Không thể tải thông tin đội bóng")
+                return
+
+            # Hiển thị thông tin đội bóng theo cấu trúc
+            self.team_text.insert("end", f"ĐỘI BÓNG: {data.get('name', 'N/A')}\n\n", "header")
+            self.team_text.insert("end", f"Tên viết tắt: {data.get('tla', 'N/A')}\n")
+            self.team_text.insert("end", f"Quốc gia: {data.get('area', {}).get('name', 'N/A')}\n")
+            self.team_text.insert("end", f"Năm thành lập: {data.get('founded', 'N/A')}\n")
+            self.team_text.insert("end", f"Sân nhà: {data.get('venue', 'N/A')}\n")
+            self.team_text.insert("end", f"Màu áo: {data.get('clubColors', 'N/A')}\n")
+            self.team_text.insert("end", f"Website: {data.get('website', 'N/A')}\n\n")
+
+            # Hiển thị danh sách cầu thủ
+            self.team_text.insert("end", "DANH SÁCH CẦU THỦ:\n\n", "header")
+
+            # Cập nhật danh sách cầu thủ
+            self.players.clear()
+            squad = data.get("squad", [])
+
+            # Tạo bảng hiển thị danh sách cầu thủ
+            fmt = "{:<3} {:<25} {:<20} {:<15}\n"
+            self.team_text.insert("end", fmt.format("STT", "Tên cầu thủ", "Vị trí", "Quốc tịch"))
+            self.team_text.insert("end", "-" * 70 + "\n")
+
+            for i, p in enumerate(squad, 1):
+                self.players[p["name"]] = p["id"]
+                position = p.get("position", "N/A")
+                nationality = p.get("nationality", "N/A")
+                self.team_text.insert("end", fmt.format(i, p["name"], position, nationality))
+
+            # Định dạng văn bản
+            self.team_text.tag_configure("header", font=("Arial", 12, "bold"))
+
+            # Cập nhật danh sách cầu thủ cho tab Player Info
+            self.player_combo["values"] = list(self.players.keys())
+
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể tải thông tin đội bóng: {str(e)}")
 
     def load_player(self):
         player_name = self.player_combo.get()
