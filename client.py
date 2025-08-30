@@ -20,7 +20,7 @@ COMPETITIONS = {
 class SoccerApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Soccer Data (football-data.org)")
+        self.title("BallTime")
         self.geometry("950x650")
 
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
