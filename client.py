@@ -177,20 +177,57 @@ class SoccerApp(tk.Tk):
             messagebox.showerror("Lỗi", f"Không thể tải danh sách trận đấu: {str(e)}")
 
     def load_standings(self):
-        comp = COMPETITIONS[self.comp_combo.get()]
-        self.client.sendall(f"standings {comp}".encode(FORMAT))
-        data = self.safe_recv()
-        self.tree_standings.delete(*self.tree_standings.get_children())
+        try:
+            # Lấy ID giải đấu từ dropdown
+            comp = COMPETITIONS[self.comp_combo.get()]
+            self.client.sendall(f"standings {comp}".encode(FORMAT))
+            data = self.safe_recv()
+            self.tree_standings.delete(*self.tree_standings.get_children())
 
-        for table in data.get("standings", []):
-            for row in table.get("table", []):
-                self.tree_standings.insert(
-                    "", "end",
-                    values=(row["position"], row["team"]["name"], row["playedGames"], row["points"])
-                )
-                self.teams[row["team"]["name"]] = row["team"]["id"]
+            # Kiểm tra dữ liệu trả về
+            if not data.get("standings"):
+                self.tree_standings.insert("", "end", values=("Không có dữ liệu bảng xếp hạng", "", "", ""))
+                return
 
-        self.team_combo["values"] = list(self.teams.keys())
+            # Thêm cột mới vào bảng
+            if len(self.tree_standings["columns"]) == 4:  # Nếu chỉ có 4 cột mặc định
+                self.tree_standings["columns"] = ("pos", "team", "played", "won", "draw", "lost", "gf", "ga", "gd",
+                                                  "points")
+                for col in self.tree_standings["columns"]:
+                    self.tree_standings.heading(col, text=col.upper())
+
+            # Hiển thị từng bảng đấu (với giải đấu có nhiều bảng như Champions League)
+            for table in data.get("standings", []):
+                # Hiển thị tên bảng đấu (nếu có)
+                if "group" in table:
+                    self.tree_standings.insert("", "end",
+                                               values=(f"--- BẢNG {table['group']} ---", "", "", "", "", "", "", "", "",
+                                                       ""))
+
+                # Hiển thị từng đội trong bảng
+                for row in table.get("table", []):
+                    self.tree_standings.insert(
+                        "", "end",
+                        values=(
+                            row["position"],
+                            row["team"]["name"],
+                            row["playedGames"],
+                            row["won"],
+                            row["draw"],
+                            row["lost"],
+                            row["goalsFor"],
+                            row["goalsAgainst"],
+                            row["goalDifference"],
+                            row["points"]
+                        )
+                    )
+                    self.teams[row["team"]["name"]] = row["team"]["id"]
+
+            # Cập nhật danh sách đội
+            self.team_combo["values"] = list(self.teams.keys())
+
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể tải bảng xếp hạng: {str(e)}")
 
     def load_scorers(self):
         comp = COMPETITIONS[self.comp_combo.get()]
