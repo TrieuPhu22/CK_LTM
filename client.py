@@ -2,6 +2,7 @@ import socket
 import tkinter as tk
 from tkinter import ttk, messagebox
 import json
+from datetime import datetime
 
 HOST = "127.0.0.1"
 PORT = 65432
@@ -15,6 +16,7 @@ COMPETITIONS = {
     "Champions League": "2001",
 }
 
+
 class SoccerApp(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -24,8 +26,8 @@ class SoccerApp(tk.Tk):
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.connect((HOST, PORT))
 
-        self.teams = {}     # {team_name: team_id}
-        self.players = {}   # {player_name: player_id}
+        self.teams = {}  # {team_name: team_id}
+        self.players = {}  # {player_name: player_id}
 
         # Tabs
         self.notebook = ttk.Notebook(self)
@@ -55,26 +57,26 @@ class SoccerApp(tk.Tk):
         tk.Button(self.tab_matches, text="Load Matches", command=self.load_matches).pack()
 
         self.tree_matches = ttk.Treeview(
-            self.tab_matches, columns=("home","away","score","status","date"), show="headings"
+            self.tab_matches, columns=("home", "away", "score", "status", "date"), show="headings"
         )
-        for col in ("home","away","score","status","date"):
+        for col in ("home", "away", "score", "status", "date"):
             self.tree_matches.heading(col, text=col)
         self.tree_matches.pack(fill="both", expand=True)
 
         # Standings tab
         self.tree_standings = ttk.Treeview(
-            self.tab_standings, columns=("pos","team","played","points"), show="headings"
+            self.tab_standings, columns=("pos", "team", "played", "points"), show="headings"
         )
-        for col in ("pos","team","played","points"):
+        for col in ("pos", "team", "played", "points"):
             self.tree_standings.heading(col, text=col)
         self.tree_standings.pack(fill="both", expand=True)
         tk.Button(self.tab_standings, text="Load Standings", command=self.load_standings).pack()
 
         # Scorers tab
         self.tree_scorers = ttk.Treeview(
-            self.tab_scorers, columns=("player","team","goals"), show="headings"
+            self.tab_scorers, columns=("player", "team", "goals"), show="headings"
         )
-        for col in ("player","team","goals"):
+        for col in ("player", "team", "goals"):
             self.tree_scorers.heading(col, text=col)
         self.tree_scorers.pack(fill="both", expand=True)
         tk.Button(self.tab_scorers, text="Load Scorers", command=self.load_scorers).pack()
@@ -99,58 +101,133 @@ class SoccerApp(tk.Tk):
         data = self.client.recv(65535).decode(FORMAT)
         try:
             return json.loads(data)
-        except:
+        except json.JSONDecodeError:
+            messagebox.showerror("Error", "Dữ liệu không hợp lệ từ server")
             return {}
 
     def load_matches(self):
-        comp = COMPETITIONS[self.comp_combo.get()]
-        self.client.sendall(f"matches {comp}".encode(FORMAT))
-        data = self.safe_recv()
+        try:
+            # Lấy ID giải đấu từ dropdown
+            comp = COMPETITIONS[self.comp_combo.get()]
+            self.client.sendall(f"matches {comp}".encode(FORMAT))
+            data = self.safe_recv()
 
-        self.tree_matches.delete(*self.tree_matches.get_children())
-        self.teams.clear()
+            # Xóa dữ liệu cũ
+            self.tree_matches.delete(*self.tree_matches.get_children())
+            self.teams.clear()
 
-        filter_mode = self.filter_combo.get()
+            # Lọc theo trạng thái
+            filter_mode = self.filter_combo.get()
 
-        for m in data.get("matches", []):
-            status = m["status"]
+            # Hiển thị thông báo nếu không có trận đấu
+            if not data.get("matches"):
+                self.tree_matches.insert("", "end", values=("Không có dữ liệu", "", "", "", ""))
+                return
 
-            if filter_mode == "Finished" and status != "FINISHED":
-                continue
-            if filter_mode == "Upcoming" and status != "TIMED":
-                continue
-            if filter_mode == "Live" and status not in ("LIVE", "IN_PLAY", "PAUSED"):
-                continue
+            # Xử lý từng trận đấu
+            for m in data.get("matches", []):
+                status = m["status"]
 
-            score = f"{m['score']['fullTime']['home']}-{m['score']['fullTime']['away']}"
-            self.tree_matches.insert(
-                "", "end",
-                values=(m["homeTeam"]["name"], m["awayTeam"]["name"], score, status, m["utcDate"])
-            )
-            self.teams[m["homeTeam"]["name"]] = m["homeTeam"]["id"]
-            self.teams[m["awayTeam"]["name"]] = m["awayTeam"]["id"]
+                # Lọc theo trạng thái
+                if filter_mode == "Finished" and status != "FINISHED":
+                    continue
+                if filter_mode == "Upcoming" and status != "TIMED":
+                    continue
+                if filter_mode == "Live" and status not in ("LIVE", "IN_PLAY", "PAUSED"):
+                    continue
 
-        self.team_combo["values"] = list(self.teams.keys())
+                # Xử lý trường hợp không có điểm số
+                home_score = m['score']['fullTime']['home'] if m['score']['fullTime']['home'] is not None else "-"
+                away_score = m['score']['fullTime']['away'] if m['score']['fullTime']['away'] is not None else "-"
+                score = f"{home_score}-{away_score}"
 
-        # Auto refresh nếu chọn Live
-        if filter_mode == "Live":
-            self.after(30000, self.load_matches)
+                # Định dạng ngày giờ
+                try:
+                    date_time = datetime.fromisoformat(m["utcDate"].replace("Z", "+00:00"))
+                    formatted_date = date_time.strftime("%d/%m/%Y %H:%M")
+                except:
+                    formatted_date = m["utcDate"]
+
+                # Hiển thị trạng thái rõ ràng hơn
+                status_display = {
+                    "FINISHED": "Kết thúc",
+                    "LIVE": "LIVE",
+                    "IN_PLAY": "Đang đấu",
+                    "PAUSED": "Tạm dừng",
+                    "TIMED": "Sắp diễn ra",
+                    "SCHEDULED": "Đã lên lịch"
+                }.get(status, status)
+
+                # Thêm vào bảng
+                self.tree_matches.insert(
+                    "", "end",
+                    values=(m["homeTeam"]["name"], m["awayTeam"]["name"], score, status_display, formatted_date)
+                )
+                self.teams[m["homeTeam"]["name"]] = m["homeTeam"]["id"]
+                self.teams[m["awayTeam"]["name"]] = m["awayTeam"]["id"]
+
+            # Cập nhật danh sách đội
+            self.team_combo["values"] = list(self.teams.keys())
+
+            # Tự động làm mới nếu đang xem trận đấu trực tiếp
+            if filter_mode == "Live":
+                self.after(30000, self.load_matches)
+
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể tải danh sách trận đấu: {str(e)}")
 
     def load_standings(self):
-        comp = COMPETITIONS[self.comp_combo.get()]
-        self.client.sendall(f"standings {comp}".encode(FORMAT))
-        data = self.safe_recv()
-        self.tree_standings.delete(*self.tree_standings.get_children())
+        try:
+            # Lấy ID giải đấu từ dropdown
+            comp = COMPETITIONS[self.comp_combo.get()]
+            self.client.sendall(f"standings {comp}".encode(FORMAT))
+            data = self.safe_recv()
+            self.tree_standings.delete(*self.tree_standings.get_children())
 
-        for table in data.get("standings", []):
-            for row in table.get("table", []):
-                self.tree_standings.insert(
-                    "", "end",
-                    values=(row["position"], row["team"]["name"], row["playedGames"], row["points"])
-                )
-                self.teams[row["team"]["name"]] = row["team"]["id"]
+            # Kiểm tra dữ liệu trả về
+            if not data.get("standings"):
+                self.tree_standings.insert("", "end", values=("Không có dữ liệu bảng xếp hạng", "", "", ""))
+                return
 
-        self.team_combo["values"] = list(self.teams.keys())
+            # Thêm cột mới vào bảng
+            if len(self.tree_standings["columns"]) == 4:  # Nếu chỉ có 4 cột mặc định
+                self.tree_standings["columns"] = ("pos", "team", "played", "won", "draw", "lost", "gf", "ga", "gd",
+                                                  "points")
+                for col in self.tree_standings["columns"]:
+                    self.tree_standings.heading(col, text=col.upper())
+
+            # Hiển thị từng bảng đấu (với giải đấu có nhiều bảng như Champions League)
+            for table in data.get("standings", []):
+                # Hiển thị tên bảng đấu (nếu có)
+                if "group" in table:
+                    self.tree_standings.insert("", "end",
+                                               values=(f"--- BẢNG {table['group']} ---", "", "", "", "", "", "", "", "",
+                                                       ""))
+
+                # Hiển thị từng đội trong bảng
+                for row in table.get("table", []):
+                    self.tree_standings.insert(
+                        "", "end",
+                        values=(
+                            row["position"],
+                            row["team"]["name"],
+                            row["playedGames"],
+                            row["won"],
+                            row["draw"],
+                            row["lost"],
+                            row["goalsFor"],
+                            row["goalsAgainst"],
+                            row["goalDifference"],
+                            row["points"]
+                        )
+                    )
+                    self.teams[row["team"]["name"]] = row["team"]["id"]
+
+            # Cập nhật danh sách đội
+            self.team_combo["values"] = list(self.teams.keys())
+
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể tải bảng xếp hạng: {str(e)}")
 
     def load_scorers(self):
         comp = COMPETITIONS[self.comp_combo.get()]
