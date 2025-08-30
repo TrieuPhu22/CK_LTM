@@ -99,7 +99,8 @@ class SoccerApp(tk.Tk):
         data = self.client.recv(65535).decode(FORMAT)
         try:
             return json.loads(data)
-        except:
+        except json.JSONDecodeError:
+            messagebox.showerror("Error", "Dữ liệu không hợp lệ từ server")
             return {}
 
     def load_matches(self):
