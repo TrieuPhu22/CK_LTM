@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import json
 from datetime import datetime
+from improved_ui import MAIN_BG, HEADER_BG, HEADER_FG, BUTTON_BG, BUTTON_FG, TREEVIEW_BG, TREEVIEW_SELECT, LABEL_FG
 
 HOST = "127.0.0.1"
 PORT = 65432
@@ -96,6 +97,29 @@ class SoccerApp(tk.Tk):
         tk.Button(self.tab_player, text="Load Player Info", command=self.load_player).pack()
         self.player_text = tk.Text(self.tab_player)
         self.player_text.pack(fill="both", expand=True)
+
+        # Configure styles
+        self.configure_styles()
+
+    def configure_styles(self):
+        style = ttk.Style()
+        style.configure("TNotebook", tabposition="wn")
+        style.configure("TNotebook.Tab", padding=[10, 5])
+        style.configure("TButton", padding=6)
+        style.configure("TCombobox", padding=6)
+        style.configure("Treeview", rowheight=25)
+        style.map("Treeview", background=[("selected", TREEVIEW_SELECT)], foreground=[("selected", TREEVIEW_BG)])
+
+        # Header style
+        style.configure("Header.TLabel", background=HEADER_BG, foreground=HEADER_FG, font=("Arial", 10, "bold"))
+
+        # Button style
+        style.configure("TButton", background=BUTTON_BG, foreground=BUTTON_FG)
+        style.map("TButton", background=[("active", BUTTON_FG)], foreground=[("active", BUTTON_BG)])
+
+        # Treeview style
+        style.configure("Treeview.Heading", font=("Arial", 10, "bold"))
+        style.map("Treeview.Heading", background=[("active", HEADER_BG)], foreground=[("active", HEADER_FG)])
 
     def safe_recv(self):
         data = self.client.recv(65535).decode(FORMAT)
