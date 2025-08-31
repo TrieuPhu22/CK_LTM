@@ -194,3 +194,5 @@ class SoccerApp(tk.Tk):
 if __name__ == "__main__":
     app = SoccerApp()
     app.mainloop()
+
+#quan
