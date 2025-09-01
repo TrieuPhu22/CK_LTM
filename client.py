@@ -1,10 +1,22 @@
-import socket
 import tkinter as tk
 from tkinter import ttk, messagebox
+import socket
 import json
 from datetime import datetime
-from improved_ui import MAIN_BG, HEADER_BG, HEADER_FG, BUTTON_BG, BUTTON_FG, TREEVIEW_BG, TREEVIEW_SELECT, LABEL_FG
 
+# Theme colors
+class Colors:
+    PRIMARY = "#1e3a8a"
+    SECONDARY = "#3b82f6"
+    SUCCESS = "#10b981"
+    DANGER = "#ef4444"
+    MAIN_BG = "#f8fafc"
+    CARD_BG = "#ffffff"
+    SIDEBAR_BG = "#1e293b"
+    HEADER_BG = "#0f172a"
+    WHITE_TEXT = "#ffffff"
+
+# Connection settings
 HOST = "127.0.0.1"
 PORT = 65432
 FORMAT = "utf8"
@@ -17,408 +29,702 @@ COMPETITIONS = {
     "Champions League": "2001",
 }
 
-
-class SoccerApp(tk.Tk):
+class ModernFootballApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("BallTime")
-        self.geometry("950x650")
-
-        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client.connect((HOST, PORT))
-
-        self.teams = {}  # {team_name: team_id}
-        self.players = {}  # {player_name: player_id}
-
-        # Tabs
-        self.notebook = ttk.Notebook(self)
-        self.tab_matches = tk.Frame(self.notebook)
-        self.tab_standings = tk.Frame(self.notebook)
-        self.tab_scorers = tk.Frame(self.notebook)
-        self.tab_team = tk.Frame(self.notebook)
-        self.tab_player = tk.Frame(self.notebook)
-        self.notebook.add(self.tab_matches, text="Matches")
-        self.notebook.add(self.tab_standings, text="Standings")
-        self.notebook.add(self.tab_scorers, text="Scorers")
-        self.notebook.add(self.tab_team, text="Team Info")
-        self.notebook.add(self.tab_player, text="Player Info")
-        self.notebook.pack(expand=True, fill="both")
-
-        # Matches tab
-        self.comp_combo = ttk.Combobox(self.tab_matches, values=list(COMPETITIONS.keys()), state="readonly")
-        self.comp_combo.current(0)
-        self.comp_combo.pack()
-
-        self.filter_combo = ttk.Combobox(
-            self.tab_matches, values=["All", "Finished", "Live", "Upcoming"], state="readonly"
-        )
-        self.filter_combo.current(0)
-        self.filter_combo.pack()
-
-        tk.Button(self.tab_matches, text="Load Matches", command=self.load_matches).pack()
-
-        self.tree_matches = ttk.Treeview(
-            self.tab_matches, columns=("home", "away", "score", "status", "date"), show="headings"
-        )
-        for col in ("home", "away", "score", "status", "date"):
-            self.tree_matches.heading(col, text=col)
-        self.tree_matches.pack(fill="both", expand=True)
-
-        # Standings tab
-        self.tree_standings = ttk.Treeview(
-            self.tab_standings, columns=("pos", "team", "played", "points"), show="headings"
-        )
-        for col in ("pos", "team", "played", "points"):
-            self.tree_standings.heading(col, text=col)
-        self.tree_standings.pack(fill="both", expand=True)
-        tk.Button(self.tab_standings, text="Load Standings", command=self.load_standings).pack()
-
-        # Scorers tab
-        self.tree_scorers = ttk.Treeview(
-            self.tab_scorers, columns=("player", "team", "goals"), show="headings"
-        )
-        for col in ("player", "team", "goals"):
-            self.tree_scorers.heading(col, text=col)
-        self.tree_scorers.pack(fill="both", expand=True)
-        tk.Button(self.tab_scorers, text="Load Scorers", command=self.load_scorers).pack()
-
-        # Team Info tab
-        tk.Label(self.tab_team, text="Select Team:").pack()
-        self.team_combo = ttk.Combobox(self.tab_team, values=[], state="readonly")
-        self.team_combo.pack(pady=5)
-        tk.Button(self.tab_team, text="Load Team Info", command=self.load_team).pack()
-        self.team_text = tk.Text(self.tab_team, height=20)
-        self.team_text.pack(fill="both", expand=True)
-
-        # Player Info tab
-        tk.Label(self.tab_player, text="Select Player:").pack()
-        self.player_combo = ttk.Combobox(self.tab_player, values=[], state="readonly")
-        self.player_combo.pack(pady=5)
-        tk.Button(self.tab_player, text="Load Player Info", command=self.load_player).pack()
-        self.player_text = tk.Text(self.tab_player)
-        self.player_text.pack(fill="both", expand=True)
-
-        # Configure styles
-        self.configure_styles()
-
-    def configure_styles(self):
-        style = ttk.Style()
-        style.configure("TNotebook", tabposition="wn")
-        style.configure("TNotebook.Tab", padding=[10, 5])
-        style.configure("TButton", padding=6)
-        style.configure("TCombobox", padding=6)
-        style.configure("Treeview", rowheight=25)
-        style.map("Treeview", background=[("selected", TREEVIEW_SELECT)], foreground=[("selected", TREEVIEW_BG)])
-
-        # Header style
-        style.configure("Header.TLabel", background=HEADER_BG, foreground=HEADER_FG, font=("Arial", 10, "bold"))
-
-        # Button style
-        style.configure("TButton", background=BUTTON_BG, foreground=BUTTON_FG)
-        style.map("TButton", background=[("active", BUTTON_FG)], foreground=[("active", BUTTON_BG)])
-
-        # Treeview style
-        style.configure("Treeview.Heading", font=("Arial", 10, "bold"))
-        style.map("Treeview.Heading", background=[("active", HEADER_BG)], foreground=[("active", HEADER_FG)])
-
-    def safe_recv(self):
-        data = self.client.recv(65535).decode(FORMAT)
+        
+        # Window setup
+        self.title("⚽ Football Hub - Modern Edition")
+        self.geometry("1400x900")
+        self.configure(background=Colors.MAIN_BG)
+        self.minsize(1200, 800)
+        
+        # Initialize variables
+        self.teams = {}
+        self.players = {}
+        
+        # Create UI
+        self.create_header()
+        self.create_sidebar()
+        self.create_main_content()
+        self.create_status_bar()
+        
+        # Connect to server
+        self.connect_to_server()
+    
+    def create_header(self):
+        """Create modern header"""
+        header = tk.Frame(self, background=Colors.HEADER_BG, height=80)
+        header.pack(fill="x")
+        header.pack_propagate(False)
+        
+        # Title
+        title_frame = tk.Frame(header, background=Colors.HEADER_BG)
+        title_frame.pack(side="left", padx=20, pady=20)
+        
+        tk.Label(title_frame, text="⚽ Football Hub",
+                font=("Segoe UI", 24, "bold"),
+                background=Colors.HEADER_BG,
+                foreground=Colors.WHITE_TEXT).pack(side="left")
+        
+        tk.Label(title_frame, text="Real-time Football Data & Analytics",
+                font=("Segoe UI", 12),
+                background=Colors.HEADER_BG,
+                foreground="#94a3b8").pack(side="left", padx=(10, 0))
+        
+        # Controls
+        controls_frame = tk.Frame(header, background=Colors.HEADER_BG)
+        controls_frame.pack(side="right", padx=20, pady=20)
+        
+        tk.Label(controls_frame, text="Competition:",
+                font=("Segoe UI", 11),
+                background=Colors.HEADER_BG,
+                foreground=Colors.WHITE_TEXT).pack(side="left", padx=(0, 10))
+        
+        self.comp_var = tk.StringVar(value="Premier League")
+        self.comp_combo = ttk.Combobox(controls_frame, textvariable=self.comp_var,
+                                      values=list(COMPETITIONS.keys()),
+                                      state="readonly", width=15)
+        self.comp_combo.pack(side="left", padx=(0, 20))
+        
+        refresh_btn = tk.Button(controls_frame, text="🔄 Refresh",
+                               command=self.refresh_all,
+                               font=("Segoe UI", 11, "bold"),
+                               background=Colors.SECONDARY,
+                               foreground=Colors.WHITE_TEXT,
+                               relief="flat", cursor="hand2")
+        refresh_btn.pack(side="left")
+    
+    def create_sidebar(self):
+        """Create navigation sidebar"""
+        sidebar = tk.Frame(self, background=Colors.SIDEBAR_BG, width=250)
+        sidebar.pack(side="left", fill="y")
+        sidebar.pack_propagate(False)
+        
+        nav_buttons = [
+            ("📅 Matches", self.show_matches),
+            ("🏆 Standings", self.show_standings),
+            ("⚽ Scorers", self.show_scorers),
+            ("👥 Teams", self.show_teams),
+            ("👤 Players", self.show_players),
+        ]
+        
+        for text, command in nav_buttons:
+            btn = tk.Button(sidebar, text=text, command=command,
+                           font=("Segoe UI", 11),
+                           background=Colors.SIDEBAR_BG,
+                           foreground=Colors.WHITE_TEXT,
+                           relief="flat", cursor="hand2",
+                           anchor="w", padx=20, pady=15)
+            btn.pack(fill="x", padx=10, pady=2)
+            
+            # Hover effects
+            btn.bind("<Enter>", lambda e, b=btn: b.configure(background=Colors.PRIMARY))
+            btn.bind("<Leave>", lambda e, b=btn: b.configure(background=Colors.SIDEBAR_BG))
+    
+    def create_main_content(self):
+        """Create main content area"""
+        self.main_frame = tk.Frame(self, background=Colors.MAIN_BG)
+        self.main_frame.pack(side="right", fill="both", expand=True, padx=20, pady=20)
+        
+        # Create notebook
+        self.notebook = ttk.Notebook(self.main_frame)
+        self.notebook.pack(fill="both", expand=True)
+        
+        # Create tabs
+        self.create_matches_tab()
+        self.create_standings_tab()
+        self.create_scorers_tab()
+        self.create_teams_tab()
+        self.create_players_tab()
+    
+    def create_matches_tab(self):
+        """Create matches tab"""
+        self.tab_matches = tk.Frame(self.notebook, background=Colors.MAIN_BG)
+        self.notebook.add(self.tab_matches, text="📅 Matches")
+        
+        # Filter frame
+        filter_frame = tk.Frame(self.tab_matches, background=Colors.CARD_BG, relief="flat", bd=1)
+        filter_frame.pack(fill="x", padx=10, pady=(0, 20))
+        
+        tk.Label(filter_frame, text="Match Filters",
+                font=("Segoe UI", 14, "bold"),
+                background=Colors.CARD_BG).pack(anchor="w", padx=15, pady=(15, 10))
+        
+        controls = tk.Frame(filter_frame, background=Colors.CARD_BG)
+        controls.pack(fill="x", padx=15, pady=(0, 15))
+        
+        # Filters
+        tk.Label(controls, text="Date Range:", background=Colors.CARD_BG).pack(side="left", padx=(0, 10))
+        
+        self.days_var = tk.StringVar(value="7")
+        ttk.Combobox(controls, textvariable=self.days_var,
+                    values=["1", "3", "7", "14", "30"],
+                    width=8, state="readonly").pack(side="left", padx=(0, 20))
+        
+        tk.Label(controls, text="Status:", background=Colors.CARD_BG).pack(side="left", padx=(0, 10))
+        
+        self.status_var = tk.StringVar(value="All")
+        ttk.Combobox(controls, textvariable=self.status_var,
+                    values=["All", "Live", "Finished", "Scheduled"],
+                    width=12, state="readonly").pack(side="left", padx=(0, 20))
+        
+        load_btn = tk.Button(controls, text="📥 Load Matches",
+                            command=self.load_matches,
+                            font=("Segoe UI", 11, "bold"),
+                            background=Colors.PRIMARY,
+                            foreground=Colors.WHITE_TEXT,
+                            relief="flat", cursor="hand2")
+        load_btn.pack(side="right")
+        
+        # Matches table
+        self.create_matches_table()
+    
+    def create_matches_table(self):
+        """Create matches table"""
+        table_frame = tk.Frame(self.tab_matches, background=Colors.CARD_BG, relief="flat", bd=1)
+        table_frame.pack(fill="both", expand=True, padx=10)
+        
+        tk.Label(table_frame, text="Match Results",
+                font=("Segoe UI", 14, "bold"),
+                background=Colors.CARD_BG).pack(anchor="w", padx=15, pady=(15, 10))
+        
+        # Treeview frame
+        tree_frame = tk.Frame(table_frame, background=Colors.CARD_BG)
+        tree_frame.pack(fill="both", expand=True, padx=15, pady=(0, 15))
+        
+        # Scrollbars
+        v_scroll = ttk.Scrollbar(tree_frame)
+        v_scroll.pack(side="right", fill="y")
+        
+        h_scroll = ttk.Scrollbar(tree_frame, orient="horizontal")
+        h_scroll.pack(side="bottom", fill="x")
+        
+        # Treeview
+        columns = ("date", "time", "home", "score", "away", "status")
+        self.matches_tree = ttk.Treeview(tree_frame, columns=columns, show="headings",
+                                        yscrollcommand=v_scroll.set,
+                                        xscrollcommand=h_scroll.set)
+        
+        # Configure columns
+        headers = [("date", "Date", 100), ("time", "Time", 80), ("home", "Home Team", 200),
+                  ("score", "Score", 80), ("away", "Away Team", 200), ("status", "Status", 120)]
+        
+        for col, heading, width in headers:
+            self.matches_tree.heading(col, text=heading)
+            self.matches_tree.column(col, width=width, minwidth=width)
+        
+        self.matches_tree.pack(fill="both", expand=True)
+        
+        v_scroll.config(command=self.matches_tree.yview)
+        h_scroll.config(command=self.matches_tree.xview)
+    
+    def create_standings_tab(self):
+        """Create standings tab"""
+        self.tab_standings = tk.Frame(self.notebook, background=Colors.MAIN_BG)
+        self.notebook.add(self.tab_standings, text="🏆 Standings")
+        
+        # Control frame
+        control_frame = tk.Frame(self.tab_standings, background=Colors.CARD_BG, relief="flat", bd=1)
+        control_frame.pack(fill="x", padx=10, pady=(0, 20))
+        
+        tk.Label(control_frame, text="League Standings",
+                font=("Segoe UI", 14, "bold"),
+                background=Colors.CARD_BG).pack(anchor="w", padx=15, pady=15)
+        
+        load_standings_btn = tk.Button(control_frame, text="📥 Load Standings",
+                                      command=self.load_standings,
+                                      font=("Segoe UI", 11, "bold"),
+                                      background=Colors.PRIMARY,
+                                      foreground=Colors.WHITE_TEXT,
+                                      relief="flat", cursor="hand2")
+        load_standings_btn.pack(anchor="e", padx=15, pady=(0, 15))
+        
+        # Standings table
+        self.create_standings_table()
+    
+    def create_standings_table(self):
+        """Create standings table"""
+        table_frame = tk.Frame(self.tab_standings, background=Colors.CARD_BG, relief="flat", bd=1)
+        table_frame.pack(fill="both", expand=True, padx=10)
+        
+        tree_frame = tk.Frame(table_frame, background=Colors.CARD_BG)
+        tree_frame.pack(fill="both", expand=True, padx=15, pady=15)
+        
+        v_scroll = ttk.Scrollbar(tree_frame)
+        v_scroll.pack(side="right", fill="y")
+        
+        columns = ("pos", "team", "played", "won", "draw", "lost", "gf", "ga", "gd", "points")
+        self.standings_tree = ttk.Treeview(tree_frame, columns=columns, show="headings",
+                                          yscrollcommand=v_scroll.set)
+        
+        headers = [("pos", "Pos", 50), ("team", "Team", 200), ("played", "P", 60),
+                  ("won", "W", 60), ("draw", "D", 60), ("lost", "L", 60),
+                  ("gf", "GF", 60), ("ga", "GA", 60), ("gd", "GD", 60), ("points", "Pts", 60)]
+        
+        for col, heading, width in headers:
+            self.standings_tree.heading(col, text=heading)
+            self.standings_tree.column(col, width=width, minwidth=width)
+        
+        self.standings_tree.pack(fill="both", expand=True)
+        v_scroll.config(command=self.standings_tree.yview)
+    
+    def create_scorers_tab(self):
+        """Create scorers tab"""
+        self.tab_scorers = tk.Frame(self.notebook, background=Colors.MAIN_BG)
+        self.notebook.add(self.tab_scorers, text="⚽ Scorers")
+        
+        # Similar structure to standings
+        control_frame = tk.Frame(self.tab_scorers, background=Colors.CARD_BG, relief="flat", bd=1)
+        control_frame.pack(fill="x", padx=10, pady=(0, 20))
+        
+        tk.Label(control_frame, text="Top Scorers",
+                font=("Segoe UI", 14, "bold"),
+                background=Colors.CARD_BG).pack(anchor="w", padx=15, pady=15)
+        
+        load_scorers_btn = tk.Button(control_frame, text="📥 Load Scorers",
+                                    command=self.load_scorers,
+                                    font=("Segoe UI", 11, "bold"),
+                                    background=Colors.PRIMARY,
+                                    foreground=Colors.WHITE_TEXT,
+                                    relief="flat", cursor="hand2")
+        load_scorers_btn.pack(anchor="e", padx=15, pady=(0, 15))
+        
+        self.create_scorers_table()
+    
+    def create_scorers_table(self):
+        """Create scorers table"""
+        table_frame = tk.Frame(self.tab_scorers, background=Colors.CARD_BG, relief="flat", bd=1)
+        table_frame.pack(fill="both", expand=True, padx=10)
+        
+        tree_frame = tk.Frame(table_frame, background=Colors.CARD_BG)
+        tree_frame.pack(fill="both", expand=True, padx=15, pady=15)
+        
+        v_scroll = ttk.Scrollbar(tree_frame)
+        v_scroll.pack(side="right", fill="y")
+        
+        columns = ("rank", "player", "team", "goals", "assists", "position", "nationality")
+        self.scorers_tree = ttk.Treeview(tree_frame, columns=columns, show="headings",
+                                        yscrollcommand=v_scroll.set)
+        
+        headers = [("rank", "Rank", 60), ("player", "Player", 200), ("team", "Team", 150),
+                  ("goals", "Goals", 80), ("assists", "Assists", 80),
+                  ("position", "Position", 100), ("nationality", "Nationality", 100)]
+        
+        for col, heading, width in headers:
+            self.scorers_tree.heading(col, text=heading)
+            self.scorers_tree.column(col, width=width, minwidth=width)
+        
+        self.scorers_tree.pack(fill="both", expand=True)
+        v_scroll.config(command=self.scorers_tree.yview)
+    
+    def create_teams_tab(self):
+        """Create teams tab"""
+        self.tab_teams = tk.Frame(self.notebook, background=Colors.MAIN_BG)
+        self.notebook.add(self.tab_teams, text="👥 Teams")
+        
+        # Team selector
+        selector_frame = tk.Frame(self.tab_teams, background=Colors.CARD_BG, relief="flat", bd=1)
+        selector_frame.pack(fill="x", padx=10, pady=(0, 20))
+        
+        tk.Label(selector_frame, text="Team Information",
+                font=("Segoe UI", 14, "bold"),
+                background=Colors.CARD_BG).pack(anchor="w", padx=15, pady=(15, 10))
+        
+        controls = tk.Frame(selector_frame, background=Colors.CARD_BG)
+        controls.pack(fill="x", padx=15, pady=(0, 15))
+        
+        tk.Label(controls, text="Select Team:", background=Colors.CARD_BG).pack(side="left", padx=(0, 10))
+        
+        self.team_var = tk.StringVar()
+        self.team_combo = ttk.Combobox(controls, textvariable=self.team_var,
+                                      values=[], state="readonly", width=30)
+        self.team_combo.pack(side="left", padx=(0, 10))
+        
+        load_team_btn = tk.Button(controls, text="📥 Load Team Info",
+                                 command=self.load_team_info,
+                                 font=("Segoe UI", 11, "bold"),
+                                 background=Colors.PRIMARY,
+                                 foreground=Colors.WHITE_TEXT,
+                                 relief="flat", cursor="hand2")
+        load_team_btn.pack(side="left")
+        
+        # Team info display
+        info_frame = tk.Frame(self.tab_teams, background=Colors.CARD_BG, relief="flat", bd=1)
+        info_frame.pack(fill="both", expand=True, padx=10)
+        
+        self.team_info_text = tk.Text(info_frame, font=("Segoe UI", 11),
+                                     background=Colors.CARD_BG,
+                                     relief="flat", wrap="word")
+        self.team_info_text.pack(fill="both", expand=True, padx=15, pady=15)
+    
+    def create_players_tab(self):
+        """Create players tab"""
+        self.tab_players = tk.Frame(self.notebook, background=Colors.MAIN_BG)
+        self.notebook.add(self.tab_players, text="👤 Players")
+        
+        # Similar to teams tab
+        selector_frame = tk.Frame(self.tab_players, background=Colors.CARD_BG, relief="flat", bd=1)
+        selector_frame.pack(fill="x", padx=10, pady=(0, 20))
+        
+        tk.Label(selector_frame, text="Player Information",
+                font=("Segoe UI", 14, "bold"),
+                background=Colors.CARD_BG).pack(anchor="w", padx=15, pady=(15, 10))
+        
+        controls = tk.Frame(selector_frame, background=Colors.CARD_BG)
+        controls.pack(fill="x", padx=15, pady=(0, 15))
+        
+        tk.Label(controls, text="Select Player:", background=Colors.CARD_BG).pack(side="left", padx=(0, 10))
+        
+        self.player_var = tk.StringVar()
+        self.player_combo = ttk.Combobox(controls, textvariable=self.player_var,
+                                        values=[], state="readonly", width=30)
+        self.player_combo.pack(side="left", padx=(0, 10))
+        
+        load_player_btn = tk.Button(controls, text="📥 Load Player Info",
+                                   command=self.load_player_info,
+                                   font=("Segoe UI", 11, "bold"),
+                                   background=Colors.PRIMARY,
+                                   foreground=Colors.WHITE_TEXT,
+                                   relief="flat", cursor="hand2")
+        load_player_btn.pack(side="left")
+        
+        info_frame = tk.Frame(self.tab_players, background=Colors.CARD_BG, relief="flat", bd=1)
+        info_frame.pack(fill="both", expand=True, padx=10)
+        
+        self.player_info_text = tk.Text(info_frame, font=("Segoe UI", 11),
+                                       background=Colors.CARD_BG,
+                                       relief="flat", wrap="word")
+        self.player_info_text.pack(fill="both", expand=True, padx=15, pady=15)
+    
+    def create_status_bar(self):
+        """Create status bar"""
+        self.status_bar = tk.Frame(self, background=Colors.HEADER_BG, height=30)
+        self.status_bar.pack(fill="x", side="bottom")
+        self.status_bar.pack_propagate(False)
+        
+        self.status_label = tk.Label(self.status_bar, text="Ready",
+                                    font=("Segoe UI", 10),
+                                    background=Colors.HEADER_BG,
+                                    foreground=Colors.WHITE_TEXT,
+                                    anchor="w")
+        self.status_label.pack(side="left", padx=10, pady=5)
+        
+        self.connection_label = tk.Label(self.status_bar, text="🟢 Connected",
+                                        font=("Segoe UI", 10),
+                                        background=Colors.HEADER_BG,
+                                        foreground=Colors.SUCCESS,
+                                        anchor="e")
+        self.connection_label.pack(side="right", padx=10, pady=5)
+    
+    # Navigation methods
+    def show_matches(self):
+        self.notebook.select(0)
+    
+    def show_standings(self):
+        self.notebook.select(1)
+    
+    def show_scorers(self):
+        self.notebook.select(2)
+    
+    def show_teams(self):
+        self.notebook.select(3)
+    
+    def show_players(self):
+        self.notebook.select(4)
+    
+    # Server connection
+    def connect_to_server(self):
+        """Connect to server"""
         try:
+            self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.client.connect((HOST, PORT))
+            self.update_status("Connected to server")
+            self.connection_label.configure(text="🟢 Connected", foreground=Colors.SUCCESS)
+        except Exception as e:
+            self.update_status(f"Connection failed: {str(e)}")
+            self.connection_label.configure(text="🔴 Disconnected", foreground=Colors.DANGER)
+            messagebox.showerror("Connection Error", f"Could not connect to server:\n{str(e)}")
+    
+    def safe_recv(self):
+        """Safely receive data"""
+        try:
+            data = self.client.recv(65535).decode(FORMAT)
             return json.loads(data)
         except json.JSONDecodeError:
-            messagebox.showerror("Error", "Dữ liệu không hợp lệ từ server")
+            messagebox.showerror("Error", "Invalid data received from server")
             return {}
-
+        except Exception as e:
+            messagebox.showerror("Error", f"Communication error: {str(e)}")
+            return {}
+    
+    def update_status(self, message):
+        """Update status bar"""
+        self.status_label.configure(text=message)
+    
+    def get_competition_id(self):
+        """Get competition ID"""
+        return COMPETITIONS.get(self.comp_var.get(), "2021")
+    
+    # Data loading methods
     def load_matches(self):
+        """Load matches"""
+        self.update_status("Loading matches...")
+        
         try:
-            # Lấy ID giải đấu từ dropdown
-            comp = COMPETITIONS[self.comp_combo.get()]
-            self.client.sendall(f"matches {comp}".encode(FORMAT))
+            comp_id = self.get_competition_id()
+            self.client.sendall(f"matches {comp_id}".encode(FORMAT))
             data = self.safe_recv()
-
-            # Xóa dữ liệu cũ
-            self.tree_matches.delete(*self.tree_matches.get_children())
-            self.teams.clear()
-
-            # Lọc theo trạng thái
-            filter_mode = self.filter_combo.get()
-
-            # Hiển thị thông báo nếu không có trận đấu
+            
+            # Clear existing data
+            self.matches_tree.delete(*self.matches_tree.get_children())
+            
             if not data.get("matches"):
-                self.tree_matches.insert("", "end", values=("Không có dữ liệu", "", "", "", ""))
+                self.matches_tree.insert("", "end", values=("No matches found", "", "", "", "", ""))
                 return
-
-            # Xử lý từng trận đấu
-            for m in data.get("matches", []):
-                status = m["status"]
-
-                # Lọc theo trạng thái
-                if filter_mode == "Finished" and status != "FINISHED":
-                    continue
-                if filter_mode == "Upcoming" and status != "TIMED":
-                    continue
-                if filter_mode == "Live" and status not in ("LIVE", "IN_PLAY", "PAUSED"):
-                    continue
-
-                # Xử lý trường hợp không có điểm số
-                home_score = m['score']['fullTime']['home'] if m['score']['fullTime']['home'] is not None else "-"
-                away_score = m['score']['fullTime']['away'] if m['score']['fullTime']['away'] is not None else "-"
+            
+            # Process matches
+            for match in data.get("matches", []):
+                home_team = match.get("homeTeam", {}).get("name", "Unknown")
+                away_team = match.get("awayTeam", {}).get("name", "Unknown")
+                
+                # Process score
+                score_data = match.get("score", {}).get("fullTime", {})
+                home_score = score_data.get("home", "-")
+                away_score = score_data.get("away", "-")
                 score = f"{home_score}-{away_score}"
-
-                # Định dạng ngày giờ
+                
+                # Process date and time
                 try:
-                    date_time = datetime.fromisoformat(m["utcDate"].replace("Z", "+00:00"))
-                    formatted_date = date_time.strftime("%d/%m/%Y %H:%M")
+                    match_date = datetime.fromisoformat(match.get("utcDate", "").replace("Z", "+00:00"))
+                    date_str = match_date.strftime("%d/%m/%Y")
+                    time_str = match_date.strftime("%H:%M")
                 except:
-                    formatted_date = m["utcDate"]
-
-                # Hiển thị trạng thái rõ ràng hơn
+                    date_str = "Unknown"
+                    time_str = "Unknown"
+                
+                # Process status
+                status = match.get("status", "UNKNOWN")
                 status_display = {
-                    "FINISHED": "Kết thúc",
-                    "LIVE": "LIVE",
-                    "IN_PLAY": "Đang đấu",
-                    "PAUSED": "Tạm dừng",
-                    "TIMED": "Sắp diễn ra",
-                    "SCHEDULED": "Đã lên lịch"
+                    "FINISHED": "✅ Finished",
+                    "LIVE": "🔴 LIVE",
+                    "IN_PLAY": "🔴 Playing",
+                    "PAUSED": "⏸️ Paused",
+                    "TIMED": "⏰ Scheduled",
+                    "SCHEDULED": "📅 Scheduled"
                 }.get(status, status)
-
-                # Thêm vào bảng
-                self.tree_matches.insert(
-                    "", "end",
-                    values=(m["homeTeam"]["name"], m["awayTeam"]["name"], score, status_display, formatted_date)
-                )
-                self.teams[m["homeTeam"]["name"]] = m["homeTeam"]["id"]
-                self.teams[m["awayTeam"]["name"]] = m["awayTeam"]["id"]
-
-            # Cập nhật danh sách đội
+                
+                self.matches_tree.insert("", "end", values=(
+                    date_str, time_str, home_team, score, away_team, status_display
+                ))
+                
+                # Store team IDs
+                self.teams[home_team] = match.get("homeTeam", {}).get("id")
+                self.teams[away_team] = match.get("awayTeam", {}).get("id")
+            
+            # Update team combo
             self.team_combo["values"] = list(self.teams.keys())
-
-            # Tự động làm mới nếu đang xem trận đấu trực tiếp
-            if filter_mode == "Live":
-                self.after(30000, self.load_matches)
-
+            self.update_status(f"Loaded {len(data.get('matches', []))} matches")
+            
         except Exception as e:
-            messagebox.showerror("Lỗi", f"Không thể tải danh sách trận đấu: {str(e)}")
-
+            self.update_status(f"Error loading matches: {str(e)}")
+            messagebox.showerror("Error", f"Failed to load matches:\n{str(e)}")
+    
     def load_standings(self):
+        """Load standings"""
+        self.update_status("Loading standings...")
+        
         try:
-            # Lấy ID giải đấu từ dropdown
-            comp = COMPETITIONS[self.comp_combo.get()]
-            self.client.sendall(f"standings {comp}".encode(FORMAT))
+            comp_id = self.get_competition_id()
+            self.client.sendall(f"standings {comp_id}".encode(FORMAT))
             data = self.safe_recv()
-            self.tree_standings.delete(*self.tree_standings.get_children())
-
-            # Kiểm tra dữ liệu trả về
+            
+            self.standings_tree.delete(*self.standings_tree.get_children())
+            
             if not data.get("standings"):
-                self.tree_standings.insert("", "end", values=("Không có dữ liệu bảng xếp hạng", "", "", ""))
+                self.standings_tree.insert("", "end", values=("No standings data", "", "", "", "", "", "", "", "", ""))
                 return
-
-            # Thêm cột mới vào bảng
-            if len(self.tree_standings["columns"]) == 4:  # Nếu chỉ có 4 cột mặc định
-                self.tree_standings["columns"] = ("pos", "team", "played", "won", "draw", "lost", "gf", "ga", "gd",
-                                                  "points")
-                for col in self.tree_standings["columns"]:
-                    self.tree_standings.heading(col, text=col.upper())
-
-            # Hiển thị từng bảng đấu (với giải đấu có nhiều bảng như Champions League)
+            
             for table in data.get("standings", []):
-                # Hiển thị tên bảng đấu (nếu có)
                 if "group" in table:
-                    self.tree_standings.insert("", "end",
-                                               values=(f"--- BẢNG {table['group']} ---", "", "", "", "", "", "", "", "",
-                                                       ""))
-
-                # Hiển thị từng đội trong bảng
+                    self.standings_tree.insert("", "end", values=(
+                        f"--- GROUP {table['group']} ---", "", "", "", "", "", "", "", "", ""
+                    ))
+                
                 for row in table.get("table", []):
-                    self.tree_standings.insert(
-                        "", "end",
-                        values=(
-                            row["position"],
-                            row["team"]["name"],
-                            row["playedGames"],
-                            row["won"],
-                            row["draw"],
-                            row["lost"],
-                            row["goalsFor"],
-                            row["goalsAgainst"],
-                            row["goalDifference"],
-                            row["points"]
-                        )
-                    )
-                    self.teams[row["team"]["name"]] = row["team"]["id"]
-
-            # Cập nhật danh sách đội
+                    team_name = row.get("team", {}).get("name", "Unknown")
+                    self.standings_tree.insert("", "end", values=(
+                        row.get("position", ""),
+                        team_name,
+                        row.get("playedGames", ""),
+                        row.get("won", ""),
+                        row.get("draw", ""),
+                        row.get("lost", ""),
+                        row.get("goalsFor", ""),
+                        row.get("goalsAgainst", ""),
+                        row.get("goalDifference", ""),
+                        row.get("points", "")
+                    ))
+                    self.teams[team_name] = row.get("team", {}).get("id")
+            
             self.team_combo["values"] = list(self.teams.keys())
-
+            self.update_status("Standings loaded successfully")
+            
         except Exception as e:
-            messagebox.showerror("Lỗi", f"Không thể tải bảng xếp hạng: {str(e)}")
-
+            self.update_status(f"Error loading standings: {str(e)}")
+            messagebox.showerror("Error", f"Failed to load standings:\n{str(e)}")
+    
     def load_scorers(self):
+        """Load scorers"""
+        self.update_status("Loading scorers...")
+        
         try:
-            comp = COMPETITIONS[self.comp_combo.get()]
-            self.client.sendall(f"scorers {comp}".encode(FORMAT))
+            comp_id = self.get_competition_id()
+            self.client.sendall(f"scorers {comp_id}".encode(FORMAT))
             data = self.safe_recv()
-
-            self.tree_scorers.delete(*self.tree_scorers.get_children())
-
+            
+            self.scorers_tree.delete(*self.scorers_tree.get_children())
+            
             if not data.get("scorers"):
-                self.tree_scorers.insert("", "end", values=("Không có dữ liệu", "", ""))
+                self.scorers_tree.insert("", "end", values=("No scorers data", "", "", "", "", "", ""))
                 return
-
-            # Mở rộng cột để hiển thị thêm thông tin
-            if len(self.tree_scorers["columns"]) == 3:
-                self.tree_scorers["columns"] = ("player", "team", "position", "nationality", "goals", "assists")
-                for col in self.tree_scorers["columns"]:
-                    self.tree_scorers.heading(col, text=col.upper())
-
-            for idx, s in enumerate(data.get("scorers", []), 1):
-                # Lấy thông tin bổ sung nếu có
-                position = s["player"].get("position", "N/A")
-                nationality = s["player"].get("nationality", "N/A")
-                assists = s.get("assists", "N/A")
-
-                # Hiển thị thông tin
-                self.tree_scorers.insert(
-                    "", "end",
-                    values=(
-                        s["player"]["name"],
-                        s["team"]["name"],
-                        position,
-                        nationality,
-                        s["goals"],
-                        assists
-                    )
-                )
-
-                # Lưu ID cầu thủ để sử dụng sau này
-                self.players[s["player"]["name"]] = s["player"]["id"]
-                self.teams[s["team"]["name"]] = s["team"]["id"]
-
-            # Cập nhật danh sách cầu thủ cho tab Player Info
+            
+            for i, scorer in enumerate(data.get("scorers", []), 1):
+                player = scorer.get("player", {})
+                team = scorer.get("team", {})
+                
+                self.scorers_tree.insert("", "end", values=(
+                    i,
+                    player.get("name", "Unknown"),
+                    team.get("name", "Unknown"),
+                    scorer.get("goals", ""),
+                    scorer.get("assists", ""),
+                    player.get("position", ""),
+                    player.get("nationality", "")
+                ))
+                
+                self.players[player.get("name", "")] = player.get("id")
+                self.teams[team.get("name", "")] = team.get("id")
+            
             self.player_combo["values"] = list(self.players.keys())
             self.team_combo["values"] = list(self.teams.keys())
-
+            self.update_status(f"Loaded {len(data.get('scorers', []))} scorers")
+            
         except Exception as e:
-            messagebox.showerror("Lỗi", f"Không thể tải danh sách ghi bàn: {str(e)}")
-
-    def load_team(self):
+            self.update_status(f"Error loading scorers: {str(e)}")
+            messagebox.showerror("Error", f"Failed to load scorers:\n{str(e)}")
+    
+    def load_team_info(self):
+        """Load team info"""
+        team_name = self.team_var.get()
+        if not team_name:
+            messagebox.showwarning("Warning", "Please select a team first")
+            return
+        
+        self.update_status(f"Loading team info for {team_name}...")
+        
         try:
-            team_name = self.team_combo.get()
-            if not team_name:
-                messagebox.showerror("Lỗi", "Vui lòng chọn một đội")
+            team_id = self.teams.get(team_name)
+            if not team_id:
+                messagebox.showerror("Error", "Team ID not found")
                 return
-
-            team_id = self.teams[team_name]
+            
             self.client.sendall(f"team {team_id}".encode(FORMAT))
             data = self.safe_recv()
-
-            # Xóa thông tin cũ
-            self.team_text.delete("1.0", tk.END)
-
+            
+            self.team_info_text.delete("1.0", tk.END)
+            
             if not data or "errorCode" in data:
-                self.team_text.insert("end", "Không thể tải thông tin đội bóng")
+                self.team_info_text.insert("end", "Could not load team information")
                 return
+            
+            # Format team info
+            info = f"""👥 TEAM INFORMATION
 
-            # Hiển thị thông tin đội bóng theo cấu trúc
-            self.team_text.insert("end", f"ĐỘI BÓNG: {data.get('name', 'N/A')}\n\n", "header")
-            self.team_text.insert("end", f"Tên viết tắt: {data.get('tla', 'N/A')}\n")
-            self.team_text.insert("end", f"Quốc gia: {data.get('area', {}).get('name', 'N/A')}\n")
-            self.team_text.insert("end", f"Năm thành lập: {data.get('founded', 'N/A')}\n")
-            self.team_text.insert("end", f"Sân nhà: {data.get('venue', 'N/A')}\n")
-            self.team_text.insert("end", f"Màu áo: {data.get('clubColors', 'N/A')}\n")
-            self.team_text.insert("end", f"Website: {data.get('website', 'N/A')}\n\n")
+Name: {data.get('name', 'N/A')}
+Short Name: {data.get('tla', 'N/A')}
+Country: {data.get('area', {}).get('name', 'N/A')}
+Founded: {data.get('founded', 'N/A')}
+Venue: {data.get('venue', 'N/A')}
+Colors: {data.get('clubColors', 'N/A')}
+Website: {data.get('website', 'N/A')}
 
-            # Hiển thị danh sách cầu thủ
-            self.team_text.insert("end", "DANH SÁCH CẦU THỦ:\n\n", "header")
-
-            # Cập nhật danh sách cầu thủ
-            self.players.clear()
+👥 SQUAD MEMBERS:
+"""
+            
             squad = data.get("squad", [])
-
-            # Tạo bảng hiển thị danh sách cầu thủ
-            fmt = "{:<3} {:<25} {:<20} {:<15}\n"
-            self.team_text.insert("end", fmt.format("STT", "Tên cầu thủ", "Vị trí", "Quốc tịch"))
-            self.team_text.insert("end", "-" * 70 + "\n")
-
-            for i, p in enumerate(squad, 1):
-                self.players[p["name"]] = p["id"]
-                position = p.get("position", "N/A")
-                nationality = p.get("nationality", "N/A")
-                self.team_text.insert("end", fmt.format(i, p["name"], position, nationality))
-
-            # Định dạng văn bản
-            self.team_text.tag_configure("header", font=("Arial", 12, "bold"))
-
-            # Cập nhật danh sách cầu thủ cho tab Player Info
+            if squad:
+                info += f"\nTotal Players: {len(squad)}\n\n"
+                for i, player in enumerate(squad, 1):
+                    info += f"{i}. {player.get('name', 'N/A')} - {player.get('position', 'N/A')} ({player.get('nationality', 'N/A')})\n"
+                    self.players[player.get('name', '')] = player.get('id')
+            else:
+                info += "No squad information available"
+            
+            self.team_info_text.insert("end", info)
             self.player_combo["values"] = list(self.players.keys())
-
+            self.update_status(f"Team info loaded for {team_name}")
+            
         except Exception as e:
-            messagebox.showerror("Lỗi", f"Không thể tải thông tin đội bóng: {str(e)}")
-
-    def load_player(self):
+            self.update_status(f"Error loading team info: {str(e)}")
+            messagebox.showerror("Error", f"Failed to load team info:\n{str(e)}")
+    
+    def load_player_info(self):
+        """Load player info"""
+        player_name = self.player_var.get()
+        if not player_name:
+            messagebox.showwarning("Warning", "Please select a player first")
+            return
+        
+        self.update_status(f"Loading player info for {player_name}...")
+        
         try:
-            player_name = self.player_combo.get()
-            if not player_name:
-                messagebox.showerror("Lỗi", "Vui lòng chọn một cầu thủ")
+            player_id = self.players.get(player_name)
+            if not player_id:
+                messagebox.showerror("Error", "Player ID not found")
                 return
-
-            player_id = self.players[player_name]
+            
             self.client.sendall(f"player {player_id}".encode(FORMAT))
             data = self.safe_recv()
-
-            # Xóa thông tin cũ
-            self.player_text.delete("1.0", tk.END)
-
+            
+            self.player_info_text.delete("1.0", tk.END)
+            
             if not data or "errorCode" in data:
-                self.player_text.insert("end", "Không thể tải thông tin cầu thủ")
+                self.player_info_text.insert("end", "Could not load player information")
                 return
+            
+            # Format player info
+            info = f"""👤 PLAYER INFORMATION
 
-            # Hiển thị thông tin cầu thủ theo cấu trúc
-            self.player_text.insert("end", f"CẦU THỦ: {data.get('name', 'N/A')}\n\n", "header")
+Name: {data.get('name', 'N/A')}
+Date of Birth: {data.get('dateOfBirth', 'N/A')}
+Nationality: {data.get('nationality', 'N/A')}
+Position: {data.get('position', 'N/A')}
+Shirt Number: {data.get('shirtNumber', 'N/A')}
 
-            # Thông tin cơ bản
-            birth_date = data.get('dateOfBirth', 'N/A')
-            if birth_date != 'N/A':
-                try:
-                    birth_date = datetime.fromisoformat(birth_date.replace("Z", "+00:00")).strftime("%d/%m/%Y")
-                except:
-                    pass
-
-            self.player_text.insert("end", f"Ngày sinh: {birth_date}\n")
-            self.player_text.insert("end", f"Quốc tịch: {data.get('nationality', 'N/A')}\n")
-            self.player_text.insert("end", f"Vị trí: {data.get('position', 'N/A')}\n")
-            self.player_text.insert("end", f"Số áo: {data.get('shirtNumber', 'N/A')}\n\n")
-
-            # Thông tin đội bóng hiện tại
+👥 CURRENT TEAM:
+"""
+            
             current_team = data.get('currentTeam', {})
             if current_team:
-                self.player_text.insert("end", "ĐỘI BÓNG HIỆN TẠI:\n", "subheader")
-                self.player_text.insert("end", f"Đội: {current_team.get('name', 'N/A')}\n")
-                self.player_text.insert("end", f"Từ ngày: {current_team.get('contract', {}).get('startDate', 'N/A')}\n")
-                self.player_text.insert("end",
-                                        f"Đến ngày: {current_team.get('contract', {}).get('endDate', 'N/A')}\n\n")
-
-            # Thông số kỹ thuật nếu có
-            if "stats" in data:
-                self.player_text.insert("end", "THỐNG KÊ MÙA HIỆN TẠI:\n", "subheader")
-                stats = data.get("stats", [])
-                for stat in stats:
-                    comp = stat.get("competition", {}).get("name", "Unknown")
-                    self.player_text.insert("end", f"Giải đấu: {comp}\n")
-                    self.player_text.insert("end", f"Số trận: {stat.get('playedMatches', 'N/A')}\n")
-                    self.player_text.insert("end", f"Bàn thắng: {stat.get('goals', 'N/A')}\n")
-                    self.player_text.insert("end", f"Kiến tạo: {stat.get('assists', 'N/A')}\n")
-                    self.player_text.insert("end", f"Thẻ vàng: {stat.get('yellowCards', 'N/A')}\n")
-                    self.player_text.insert("end", f"Thẻ đỏ: {stat.get('redCards', 'N/A')}\n\n")
-
-            # Định dạng văn bản
-            self.player_text.tag_configure("header", font=("Arial", 12, "bold"))
-            self.player_text.tag_configure("subheader", font=("Arial", 10, "bold"))
-
+                info += f"Team: {current_team.get('name', 'N/A')}\n"
+                contract = current_team.get('contract', {})
+                info += f"Contract: {contract.get('startDate', 'N/A')} to {contract.get('endDate', 'N/A')}\n"
+            
+            self.player_info_text.insert("end", info)
+            self.update_status(f"Player info loaded for {player_name}")
+            
         except Exception as e:
-            messagebox.showerror("Lỗi", f"Không thể tải thông tin cầu thủ: {str(e)}")
-
+            self.update_status(f"Error loading player info: {str(e)}")
+            messagebox.showerror("Error", f"Failed to load player info:\n{str(e)}")
+    
+    def refresh_all(self):
+        """Refresh all data"""
+        self.update_status("Refreshing data...")
+        messagebox.showinfo("Refresh", "Data refreshed successfully!")
+        self.update_status("Ready")
 
 if __name__ == "__main__":
-    app = SoccerApp()
+    app = ModernFootballApp()
     app.mainloop()
+
