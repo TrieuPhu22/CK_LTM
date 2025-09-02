@@ -16,6 +16,7 @@ class Colors:
     HEADER_BG = "#0f172a"
     WHITE_TEXT = "#ffffff"
 
+
 # Connection settings
 HOST = "127.0.0.1"
 PORT = 65432
