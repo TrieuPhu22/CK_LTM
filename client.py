@@ -24,6 +24,7 @@ PORT = 65432
 FORMAT = "utf8"
 
 COMPETITIONS = {
+    "All Competitions": "all",
     "Premier League": "2021",
     "La Liga": "2014",
     "Bundesliga": "2002",
@@ -467,7 +468,8 @@ class ModernFootballApp(tk.Tk):
 
     def get_competition_id(self):
         """Get competition ID"""
-        return COMPETITIONS.get(self.comp_var.get(), "2021")
+        selected = self.comp_var.get()
+        return COMPETITIONS.get(selected, "2021")
 
     # Data loading methods
     def load_matches(self):
@@ -476,68 +478,37 @@ class ModernFootballApp(tk.Tk):
 
         try:
             comp_id = self.get_competition_id()
-            days = self.days_var.get()  # Lấy giá trị đã chọn
-            self.client.sendall(f"matches {comp_id} {days}".encode(FORMAT))
-            data = self.safe_recv()
+            days = self.days_var.get()
 
             # Clear existing data
             self.matches_tree.delete(*self.matches_tree.get_children())
 
-            # Debug output - kiểm tra dữ liệu có đúng format không
-            print(f"Received data keys: {data.keys() if data else 'No data'}")
+            if comp_id == "all":
+                # Nếu chọn "All Competitions", tải trận đấu từ tất cả các giải
+                all_matches = []
+                comp_count = 0
 
-            if not data or not data.get("matches"):
-                self.matches_tree.insert("", "end", values=("No matches found", "", "", "", "", ""))
-                self.update_status("No matches available for this period")
-                return
+                for comp_name, comp_code in COMPETITIONS.items():
+                    if comp_code == "all":  # Bỏ qua tùy chọn "All Competitions"
+                        continue
 
-            # Process matches
-            for match in data.get("matches", []):
-                try:
-                    home_team = match.get("homeTeam", {}).get("name", "Unknown")
-                    away_team = match.get("awayTeam", {}).get("name", "Unknown")
+                    self.update_status(f"Loading matches from {comp_name}...")
+                    self.client.sendall(f"matches {comp_code} {days}".encode(FORMAT))
+                    data = self.safe_recv()
 
-                    # Process score
-                    score_data = match.get("score", {}).get("fullTime", {})
-                    home_score = score_data.get("home", "-")
-                    away_score = score_data.get("away", "-")
-                    score = f"{home_score}-{away_score}"
+                    if data and "matches" in data:
+                        all_matches.extend(data["matches"])
+                        comp_count += 1
 
-                    # Process date and time
-                    try:
-                        match_date = datetime.fromisoformat(match.get("utcDate", "").replace("Z", "+00:00"))
-                        date_str = match_date.strftime("%d/%m/%Y")
-                        time_str = match_date.strftime("%H:%M")
-                    except:
-                        date_str = "Unknown"
-                        time_str = "Unknown"
+                # Xử lý và hiển thị dữ liệu trận đấu
+                self.display_matches({"matches": all_matches})
+                self.update_status(f"Loaded matches from {comp_count} competitions")
 
-                    # Process status
-                    status = match.get("status", "UNKNOWN")
-                    status_display = {
-                        "FINISHED": "✅ Finished",
-                        "LIVE": "🔴 LIVE",
-                        "IN_PLAY": "🔴 Playing",
-                        "PAUSED": "⏸️ Paused",
-                        "TIMED": "⏰ Scheduled",
-                        "SCHEDULED": "📅 Scheduled"
-                    }.get(status, status)
-
-                    self.matches_tree.insert("", "end", values=(
-                        date_str, time_str, home_team, score, away_team, status_display
-                    ))
-
-                    # Store team IDs
-                    self.teams[home_team] = match.get("homeTeam", {}).get("id")
-                    self.teams[away_team] = match.get("awayTeam", {}).get("id")
-
-                except Exception as e:
-                    print(f"Error processing match: {e}")
-                    continue
-
-            # Update team combo
-            self.team_combo["values"] = list(self.teams.keys())
-            self.update_status(f"Loaded {len(data.get('matches', []))} matches")
+            else:
+                # Tải trận đấu từ một giải cụ thể
+                self.client.sendall(f"matches {comp_id} {days}".encode(FORMAT))
+                data = self.safe_recv()
+                self.display_matches(data)
 
         except Exception as e:
             self.update_status(f"Error loading matches: {str(e)}")
@@ -736,6 +707,61 @@ Shirt Number: {data.get('shirtNumber', 'N/A')}
         self.update_status("Refreshing data...")
         messagebox.showinfo("Refresh", "Data refreshed successfully!")
         self.update_status("Ready")
+
+    def display_matches(self, data):
+        """Display matches in the treeview"""
+        if not data or not data.get("matches"):
+            self.matches_tree.insert("", "end", values=("No matches found", "", "", "", "", ""))
+            self.update_status("No matches available for this period")
+            return
+
+        # Process matches
+        for match in data.get("matches", []):
+            try:
+                home_team = match.get("homeTeam", {}).get("name", "Unknown")
+                away_team = match.get("awayTeam", {}).get("name", "Unknown")
+
+                # Process score
+                score_data = match.get("score", {}).get("fullTime", {})
+                home_score = score_data.get("home", "-")
+                away_score = score_data.get("away", "-")
+                score = f"{home_score}-{away_score}"
+
+                # Process date and time
+                try:
+                    match_date = datetime.fromisoformat(match.get("utcDate", "").replace("Z", "+00:00"))
+                    date_str = match_date.strftime("%d/%m/%Y")
+                    time_str = match_date.strftime("%H:%M")
+                except:
+                    date_str = "Unknown"
+                    time_str = "Unknown"
+
+                # Process status
+                status = match.get("status", "UNKNOWN")
+                status_display = {
+                    "FINISHED": "✅ Finished",
+                    "LIVE": "🔴 LIVE",
+                    "IN_PLAY": "🔴 Playing",
+                    "PAUSED": "⏸️ Paused",
+                    "TIMED": "⏰ Scheduled",
+                    "SCHEDULED": "📅 Scheduled"
+                }.get(status, status)
+
+                self.matches_tree.insert("", "end", values=(
+                    date_str, time_str, home_team, score, away_team, status_display
+                ))
+
+                # Store team IDs
+                self.teams[home_team] = match.get("homeTeam", {}).get("id")
+                self.teams[away_team] = match.get("awayTeam", {}).get("id")
+
+            except Exception as e:
+                print(f"Error processing match: {e}")
+                continue
+
+        # Update team combo
+        self.team_combo["values"] = list(self.teams.keys())
+        self.update_status(f"Loaded {len(data.get('matches', []))} matches")
 
 
 if __name__ == "__main__":
