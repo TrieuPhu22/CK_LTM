@@ -56,6 +56,9 @@ class ModernFootballApp(tk.Tk):
         # Connect to server
         self.connect_to_server()
 
+        # Tự động gửi UDP message sau 2 giây
+        self.after(2000, self.send_udp_message)
+
     def create_header(self):
         """Create modern header"""
         header = tk.Frame(self, background=Colors.HEADER_BG, height=80)
@@ -416,6 +419,15 @@ class ModernFootballApp(tk.Tk):
                                      anchor="w")
         self.status_label.pack(side="left", padx=10, pady=5)
 
+        # Thêm nút UDP
+        udp_btn = tk.Button(self.status_bar, text="Send UDP",
+                            command=self.send_udp_message,
+                            font=("Segoe UI", 9),
+                            background=Colors.SECONDARY,
+                            foreground=Colors.WHITE_TEXT,
+                            relief="flat", cursor="hand2")
+        udp_btn.pack(side="left", padx=10, pady=2)
+
         self.connection_label = tk.Label(self.status_bar, text="🟢 Connected",
                                          font=("Segoe UI", 10),
                                          background=Colors.HEADER_BG,
@@ -770,8 +782,39 @@ Shirt Number: {data.get('shirtNumber', 'N/A')}
         self.team_combo["values"] = list(self.teams.keys())
         self.update_status(f"Loaded {len(data.get('matches', []))} matches")
 
+    def send_udp_message(self):
+        """Gửi tin nhắn UDP và hiển thị phản hồi"""
+        try:
+            # Tạo UDP socket
+            udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+            # Chuẩn bị và gửi tin nhắn
+            message = "Hello UDP Server!"
+            self.update_status(f"Gửi tin nhắn UDP: {message}")
+            udp_socket.sendto(message.encode(), ('127.0.0.1', 12345))
+
+            # Thiết lập timeout để tránh chờ mãi mãi
+            udp_socket.settimeout(5)
+
+            # Nhận phản hồi
+            try:
+                data, server = udp_socket.recvfrom(1024)
+                response = data.decode()
+                messagebox.showinfo("UDP Response", f"Phản hồi từ server: {response}")
+                self.update_status(f"UDP: Nhận phản hồi từ {server[0]}:{server[1]}")
+            except socket.timeout:
+                messagebox.showwarning("UDP Timeout", "Không nhận được phản hồi từ server UDP")
+                self.update_status("UDP: Timeout - không nhận được phản hồi")
+        except Exception as e:
+            messagebox.showerror("UDP Error", f"Lỗi khi gửi tin nhắn UDP: {str(e)}")
+            self.update_status(f"UDP Error: {str(e)}")
+        finally:
+            # Đóng socket
+            udp_socket.close()
+
 
 if __name__ == "__main__":
     app = ModernFootballApp()
     app.mainloop()
+
 
