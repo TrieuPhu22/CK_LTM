@@ -198,6 +198,26 @@ def run_server():
             log_debug(f"Error accepting connection: {str(e)}")
 
 
+# ---------- UDP Server ----------
+def run_udp_server():
+    udp_server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # SOCK_DGRAM cho UDP
+    udp_server_socket.bind((HOST, 12345))
+
+    print("UDP Server đang chạy...")
+
+    while True:
+        try:
+            # Nhận dữ liệu (không cần accept kết nối)
+            data, client_address = udp_server_socket.recvfrom(1024)
+            print(f"Nhận từ {client_address}: {data.decode()}")
+
+            # Gửi phản hồi
+            udp_server_socket.sendto(f"Đã nhận: {data.decode()}".encode(), client_address)
+        except Exception as e:
+            log_debug(f"Error in UDP server: {str(e)}")
+
+
 if __name__ == "__main__":
     print("[STARTING] Football Data Server is starting...")
-    run_server()
+    threading.Thread(target=run_server, daemon=True).start()
+    run_udp_server()
