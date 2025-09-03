@@ -2,100 +2,138 @@ import socket
 import threading
 import requests
 import json
-from datetime import datetime, timedelta
+import time
+from datetime import datetime
 
+# ---- Basic settings ----
 HOST = "127.0.0.1"
 PORT = 65432
 FORMAT = "utf8"
 
 API_KEY = "b0fc31c76f204a5f81d3adfd97ecd66d"
 API_URL = "https://api.football-data.org/v4"
-headers = {"X-Auth-Token": API_KEY}
+HEADERS = {"X-Auth-Token": API_KEY}
 
-# ---------- API Wrappers ----------
-def get_matches_by_comp(comp_id, days=7):
-    today = datetime.today().date()
-    dateFrom = today.strftime("%Y-%m-%d")
-    dateTo = (today + timedelta(days=days)).strftime("%Y-%m-%d")
-    url = f"{API_URL}/competitions/{comp_id}/matches?dateFrom={dateFrom}&dateTo={dateTo}"
-    resp = requests.get(url, headers=headers)
-    return resp.json()
+REQUEST_TIMEOUT = 8  # seconds
+MAX_RETRIES = 3
+RETRY_BACKOFF = 0.7  # seconds
+CACHE_TTL = 60  # seconds
+
+_cache = {}  # key -> (expires_at_ts, data)
+
+
+# ====== Cache helpers ======
+def _cache_get(key):
+    item = _cache.get(key)
+    if not item:
+        return None
+    expires_at, data = item
+    if time.time() > expires_at:
+        _cache.pop(key, None)
+        return None
+    return data
+
+
+def _cache_set(key, data, ttl=CACHE_TTL):
+    _cache[key] = (time.time() + ttl, data)
+
+
+def http_get(path, params=None, ttl=CACHE_TTL):
+    """GET with retry + timeout + cache"""
+    key = ("GET", path, json.dumps(params or {}, sort_keys=True))
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+
+    url = f"{API_URL}{path}"
+    last_err = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            resp = requests.get(url, headers=HEADERS, params=params, timeout=REQUEST_TIMEOUT)
+            resp.raise_for_status()
+            data = resp.json()
+            _cache_set(key, data, ttl=ttl)
+            return data
+        except Exception as e:
+            last_err = e
+            time.sleep(RETRY_BACKOFF * attempt)
+
+    return {"error": True, "message": f"API request failed: {last_err}"}
+
+
+# ====== API wrappers ======
+def get_competitions():
+    return http_get("/competitions", params={"plan": "TIER_ONE"}, ttl=3600)
+
+
+def get_matches_by_comp(comp_id):
+    return http_get(f"/competitions/{comp_id}/matches", params={"season": datetime.now().year})
+
 
 def get_standings(comp_id):
-    url = f"{API_URL}/competitions/{comp_id}/standings"
-    resp = requests.get(url, headers=headers)
-    return resp.json()
+    return http_get(f"/competitions/{comp_id}/standings")
 
-def get_scorers(comp_id):
-    url = f"{API_URL}/competitions/{comp_id}/scorers"
-    resp = requests.get(url, headers=headers)
-    return resp.json()
 
-def get_team(team_id):
-    """Trả về thông tin chi tiết đội + squad (danh sách cầu thủ)"""
-    url = f"{API_URL}/teams/{team_id}"
-    resp = requests.get(url, headers=headers)
-    return resp.json()
+def search_teams(name):
+    return http_get("/teams", params={"name": name})
 
-def get_player(player_id):
-    """Trả về thông tin chi tiết cầu thủ"""
-    url = f"{API_URL}/persons/{player_id}"
-    resp = requests.get(url, headers=headers)
-    return resp.json()
 
-# ---------- Socket Handler ----------
+# ====== Socket server ======
 def handle_client(conn, addr):
-    print(f"[NEW CONNECTION] {addr}")
     try:
+        conn.sendall("READY".encode(FORMAT))
         while True:
-            option = conn.recv(1024).decode(FORMAT)
+            option = conn.recv(4096).decode(FORMAT)
             if not option:
                 break
 
             parts = option.split()
-            cmd = parts[0]
+            cmd = parts[0].lower()
 
-            if cmd == "matches":
+            if cmd == "health":
+                conn.sendall(json.dumps({"ok": True, "time": datetime.utcnow().isoformat() + "Z"}).encode(FORMAT))
+
+            elif cmd == "competitions":
+                data = get_competitions()
+                conn.sendall(json.dumps(data).encode(FORMAT))
+
+            elif cmd == "matches" and len(parts) >= 2:
                 comp_id = parts[1]
                 data = get_matches_by_comp(comp_id)
                 conn.sendall(json.dumps(data).encode(FORMAT))
 
-            elif cmd == "standings":
+            elif cmd == "standings" and len(parts) >= 2:
                 comp_id = parts[1]
                 data = get_standings(comp_id)
                 conn.sendall(json.dumps(data).encode(FORMAT))
 
-            elif cmd == "scorers":
-                comp_id = parts[1]
-                data = get_scorers(comp_id)
-                conn.sendall(json.dumps(data).encode(FORMAT))
-
-            elif cmd == "team":
-                team_id = parts[1]
-                data = get_team(team_id)
-                conn.sendall(json.dumps(data).encode(FORMAT))
-
-            elif cmd == "player":
-                player_id = parts[1]
-                data = get_player(player_id)
+            elif cmd == "teams" and len(parts) >= 2:
+                name = " ".join(parts[1:])
+                data = search_teams(name)
                 conn.sendall(json.dumps(data).encode(FORMAT))
 
             else:
-                conn.sendall(b"{}")
+                conn.sendall(json.dumps({"error": True, "message": "Unknown command"}).encode(FORMAT))
+
     except Exception as e:
-        print("Error:", e)
+        try:
+            conn.sendall(json.dumps({"error": True, "message": f"Server error: {e}"}).encode(FORMAT))
+        except Exception:
+            pass
     finally:
         conn.close()
 
+
 def run_server():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind((HOST, PORT))
-    s.listen()
-    print(f"[LISTENING] Server on {HOST}:{PORT}")
-    while True:
-        conn, addr = s.accept()
-        threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind((HOST, PORT))
+        server.listen(5)
+        print(f"[{datetime.now().isoformat()}] Server listening on {HOST}:{PORT}")
+        while True:
+            conn, addr = server.accept()
+            threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
+
 
 if __name__ == "__main__":
     run_server()
