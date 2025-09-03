@@ -205,14 +205,16 @@ class ModernFootballApp(tk.Tk):
         h_scroll.pack(side="bottom", fill="x")
 
         # Treeview
-        columns = ("date", "time", "home", "score", "away", "status")
+        # Thêm cột "league" vào danh sách columns
+        columns = ("date", "time", "home", "score", "away", "status", "league")
         self.matches_tree = ttk.Treeview(tree_frame, columns=columns, show="headings",
                                          yscrollcommand=v_scroll.set,
                                          xscrollcommand=h_scroll.set)
 
-        # Configure columns
+        # Configure columns - Thêm cột "league" vào headers
         headers = [("date", "Date", 100), ("time", "Time", 80), ("home", "Home Team", 200),
-                   ("score", "Score", 80), ("away", "Away Team", 200), ("status", "Status", 120)]
+                   ("score", "Score", 80), ("away", "Away Team", 200), ("status", "Status", 120),
+                   ("league", "League", 150)]  # Thêm cột League
 
         for col, heading, width in headers:
             self.matches_tree.heading(col, text=heading)
@@ -711,7 +713,8 @@ Shirt Number: {data.get('shirtNumber', 'N/A')}
     def display_matches(self, data):
         """Display matches in the treeview"""
         if not data or not data.get("matches"):
-            self.matches_tree.insert("", "end", values=("No matches found", "", "", "", "", ""))
+            self.matches_tree.insert("", "end", values=("No matches found", "", "", "", "", "",
+                                                        ""))  # Thêm một giá trị rỗng cho cột league
             self.update_status("No matches available for this period")
             return
 
@@ -747,8 +750,12 @@ Shirt Number: {data.get('shirtNumber', 'N/A')}
                     "SCHEDULED": "📅 Scheduled"
                 }.get(status, status)
 
+                # Lấy tên giải đấu
+                league_name = match.get("competition", {}).get("name", "Unknown League")
+
+                # Thêm league_name vào values
                 self.matches_tree.insert("", "end", values=(
-                    date_str, time_str, home_team, score, away_team, status_display
+                    date_str, time_str, home_team, score, away_team, status_display, league_name
                 ))
 
                 # Store team IDs
