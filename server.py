@@ -4,6 +4,8 @@ import requests
 import json
 from datetime import datetime, timedelta
 import time
+import signal
+import sys
 
 HOST = "127.0.0.1"
 PORT = 65432
@@ -147,7 +149,7 @@ def handle_client(conn, addr):
 
             if cmd == "matches":
                 comp_id = parts[1]
-                days = int(parts[2]) if len(parts) > 2 else 30  # Lấy days từ lệnh, nếu không có thì mặc định là 30
+                days = int(parts[2]) if len(parts) > 2 else 30  # Lấy days từ lệnh
                 data = get_matches_by_comp(comp_id, days)
                 response = json.dumps(data)
                 log_debug(f"Sending {len(response)} bytes of match data")
@@ -219,5 +221,23 @@ def run_udp_server():
 
 if __name__ == "__main__":
     print("[STARTING] Football Data Server is starting...")
-    threading.Thread(target=run_server, daemon=True).start()
-    run_udp_server()
+
+    # Tạo một event để kiểm soát việc dừng server
+    exit_event = threading.Event()
+
+    tcp_thread = threading.Thread(target=run_server, daemon=True)
+    udp_thread = threading.Thread(target=run_udp_server, daemon=True)
+    tcp_thread.start()
+    udp_thread.start()
+
+    print("Server running. Press Ctrl+C to stop.")
+
+    try:
+        # Đợi cho đến khi nhận được sự kiện thoát
+        while not exit_event.is_set():
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        print("\nServer shutting down...")
+        exit_event.set()  # Đặt sự kiện để các thread biết là nên dừng
+        # Cho thêm thời gian để các thread dừng gọn gàng
+        time.sleep(0.5)

@@ -34,8 +34,11 @@ COMPETITIONS = {
 
 
 class ModernFootballApp(tk.Tk):
-    def __init__(self):
+    def __init__(self, user_data=None):
         super().__init__()
+
+        # Lưu thông tin người dùng
+        self.user_data = user_data or {}
 
         # Window setup
         self.title("⚽ Football Hub - Modern Edition")
@@ -59,6 +62,9 @@ class ModernFootballApp(tk.Tk):
         # Tự động gửi UDP message sau 2 giây
         self.after(2000, self.send_udp_message)
 
+        # Thêm dòng này để xử lý sự kiện đóng cửa sổ
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
     def create_header(self):
         """Create modern header"""
         header = tk.Frame(self, background=Colors.HEADER_BG, height=80)
@@ -78,6 +84,18 @@ class ModernFootballApp(tk.Tk):
                  font=("Segoe UI", 12),
                  background=Colors.HEADER_BG,
                  foreground="#94a3b8").pack(side="left", padx=(10, 0))
+
+        # User info
+        if self.user_data:
+            user_frame = tk.Frame(header, background=Colors.HEADER_BG)
+            user_frame.pack(side="right", padx=10, pady=20)
+
+            user_label = tk.Label(user_frame,
+                                  text=f"👤 {self.user_data.get('full_name', 'User')}",
+                                  font=("Segoe UI", 11),
+                                  background=Colors.HEADER_BG,
+                                  foreground=Colors.WHITE_TEXT)
+            user_label.pack(side="right", padx=10)
 
         # Controls
         controls_frame = tk.Frame(header, background=Colors.HEADER_BG)
@@ -812,9 +830,66 @@ Shirt Number: {data.get('shirtNumber', 'N/A')}
             # Đóng socket
             udp_socket.close()
 
+    def on_closing(self):
+        # Hủy tất cả các lệnh after() đang chờ
+        for after_id in self.tk.eval('after info').split():
+            self.after_cancel(after_id)
+
+        # Code hiện tại
+        try:
+            # Đóng kết nối TCP nếu có
+            if hasattr(self, 'client') and self.client:
+                try:
+                    self.client.shutdown(socket.SHUT_RDWR)
+                    self.client.close()
+                    print("TCP connection closed")
+                except Exception as e:
+                    print(f"Error closing TCP connection: {e}")
+
+            self.destroy()
+            print("Application terminated")
+        except Exception as e:
+            print(f"Error during shutdown: {e}")
+            self.destroy()
+
 
 if __name__ == "__main__":
-    app = ModernFootballApp()
-    app.mainloop()
+    try:
+        # Import cửa sổ đăng nhập
+        from auth_ui import LoginWindow
+
+
+        # Tạo lớp quản lý ứng dụng tương tự như trong main.py
+        class FootballHubApp:
+            def __init__(self):
+                # Bắt đầu với cửa sổ đăng nhập
+                self.login_window = LoginWindow(self.on_login_success)
+                self.login_window.mainloop()
+
+            def on_login_success(self, user_data):
+                """Được gọi khi đăng nhập thành công"""
+                # Đóng cửa sổ đăng nhập trước khi mở cửa sổ chính
+                self.login_window.destroy()
+
+                # Khởi tạo ứng dụng chính với thông tin người dùng
+                self.main_app = ModernFootballApp(user_data)
+                self.main_app.mainloop()
+
+
+        # Khởi chạy ứng dụng với cửa sổ đăng nhập
+        app = FootballHubApp()
+
+    except ImportError:
+        # Nếu không tìm thấy module auth_ui, chạy trực tiếp ứng dụng chính
+        print("Warning: Running without authentication")
+        app = ModernFootballApp()
+        app.mainloop()
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+
+        traceback.print_exc()
+        app = ModernFootballApp()  # Fallback nếu có lỗi
+        app.mainloop()
 
 
