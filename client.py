@@ -789,7 +789,7 @@ Shirt Number: {data.get('shirtNumber', 'N/A')}
             udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
             # Chuẩn bị và gửi tin nhắn
-            message = "Hello UDP Server!"
+            message = "Hello My Friend!"
             self.update_status(f"Gửi tin nhắn UDP: {message}")
             udp_socket.sendto(message.encode(), ('127.0.0.1', 12345))
 
