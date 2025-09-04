@@ -90,6 +90,15 @@ class ModernFootballApp(tk.Tk):
             user_frame = tk.Frame(header, background=Colors.HEADER_BG)
             user_frame.pack(side="right", padx=10, pady=20)
 
+            # Thêm nút đăng xuất
+            logout_btn = tk.Button(user_frame, text="Đăng xuất",
+                                   command=self.logout,
+                                   font=("Segoe UI", 9),
+                                   background=Colors.DANGER,
+                                   foreground=Colors.WHITE_TEXT,
+                                   relief="flat", cursor="hand2")
+            logout_btn.pack(side="right", padx=10)
+
             user_label = tk.Label(user_frame,
                                   text=f"👤 {self.user_data.get('full_name', 'User')}",
                                   font=("Segoe UI", 11),
@@ -733,6 +742,39 @@ Shirt Number: {data.get('shirtNumber', 'N/A')}
         except Exception as e:
             self.update_status(f"Error loading player info: {str(e)}")
             messagebox.showerror("Error", f"Failed to load player info:\n{str(e)}")
+
+    def logout(self):
+        """Đăng xuất và trở về màn hình đăng nhập"""
+        msg_result = messagebox.askyesno("Xác nhận đăng xuất", "Bạn có chắc muốn đăng xuất?")
+        if not msg_result:
+            return
+
+        # Đóng kết nối socket an toàn
+        try:
+            if hasattr(self, 'client') and self.client:
+                try:
+                    self.client.shutdown(socket.SHUT_RDWR)
+                    self.client.close()
+                    print("TCP connection closed")
+                except Exception as e:
+                    print(f"Error closing TCP connection: {e}")
+
+            # Hủy tất cả các lệnh after() đang chờ
+            for after_id in self.tk.eval('after info').split():
+                self.after_cancel(after_id)
+
+            # Đóng cửa sổ hiện tại
+            self.destroy()
+
+            # Khởi động lại ứng dụng với form đăng nhập
+            from auth_ui import LoginWindow
+            from main import FootballHubApp
+
+            app = FootballHubApp()
+
+        except Exception as e:
+            print(f"Error during logout: {e}")
+            messagebox.showerror("Lỗi", f"Không thể đăng xuất: {str(e)}")
 
     def refresh_all(self):
         """Refresh all data"""
