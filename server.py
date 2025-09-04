@@ -7,6 +7,8 @@ import time
 import signal
 import sys
 
+CHAT_CLIENTS = set()  # Lưu danh sách các client đang chat
+
 HOST = "127.0.0.1"
 PORT = 65432
 FORMAT = "utf8"
@@ -202,21 +204,65 @@ def run_server():
 
 # ---------- UDP Server ----------
 def run_udp_server():
-    udp_server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # SOCK_DGRAM cho UDP
+    udp_server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_server_socket.bind((HOST, 12345))
-
-    print("UDP Server đang chạy...")
+    
+    print("UDP Chat Server đang chạy...")
+    
+    # Dictionary lưu trữ danh sách client đang kết nối
+    clients = set()
+    last_ping = {}  # Lưu thời gian ping cuối cùng của mỗi client
 
     while True:
         try:
-            # Nhận dữ liệu (không cần accept kết nối)
             data, client_address = udp_server_socket.recvfrom(1024)
-            print(f"Nhận từ {client_address}: {data.decode()}")
-
-            # Gửi phản hồi
-            udp_server_socket.sendto(f"Đã nhận: {data.decode()}".encode(), client_address)
+            message = data.decode()
+            
+            # Xử lý tin nhắn PING
+            if message.startswith("PING|"):
+                last_ping[client_address] = time.time()
+                if client_address not in clients:
+                    clients.add(client_address)
+                    print(f"New chat client connected: {client_address}")
+                continue
+            
+            # Thêm client mới vào danh sách
+            if client_address not in clients:
+                clients.add(client_address)
+                last_ping[client_address] = time.time()
+                print(f"New chat client connected: {client_address}")
+            
+            # Log tin nhắn nhận được
+            print(f"Nhận tin nhắn từ {client_address}: {message}")
+            
+            # Xóa clients không hoạt động (không ping trong 10 giây)
+            current_time = time.time()
+            inactive_clients = {
+                client for client in clients 
+                if current_time - last_ping.get(client, 0) > 10
+            }
+            
+            # Xóa các clients không hoạt động
+            for inactive in inactive_clients:
+                clients.discard(inactive)
+                last_ping.pop(inactive, None)
+                print(f"Removed inactive client: {inactive}")
+            
+            # Gửi tin nhắn đến tất cả client còn hoạt động
+            for client in clients:
+                if client != client_address:  # Không gửi lại cho người gửi
+                    try:
+                        udp_server_socket.sendto(data, client)
+                        print(f"Đã gửi tin nhắn đến {client}")
+                    except Exception as e:
+                        print(f"Lỗi gửi tin nhắn đến {client}: {e}")
+                        clients.discard(client)
+                        last_ping.pop(client, None)
+                        
         except Exception as e:
-            log_debug(f"Error in UDP server: {str(e)}")
+            print(f"Lỗi UDP server: {e}")
+            if 'client_address' in locals() and client_address in clients:
+                clients.remove(client_address)
 
 
 if __name__ == "__main__":

@@ -97,9 +97,27 @@ class ModernFootballApp(tk.Tk):
                                   foreground=Colors.WHITE_TEXT)
             user_label.pack(side="right", padx=10)
 
-        # Controls
+        # Controls frame
         controls_frame = tk.Frame(header, background=Colors.HEADER_BG)
         controls_frame.pack(side="right", padx=20, pady=20)
+
+        # Thêm nút bật/tắt chat
+        self.chat_enabled = tk.BooleanVar(value=False)
+        self.chat_window = None
+
+        self.chat_toggle = tk.Checkbutton(
+            controls_frame,
+            text="Chat",
+            variable=self.chat_enabled,
+            command=self.toggle_chat,
+            font=("Segoe UI", 11),
+            background=Colors.HEADER_BG,
+            foreground=Colors.WHITE_TEXT,
+            selectcolor=Colors.SECONDARY,
+            activebackground=Colors.HEADER_BG,
+            activeforeground=Colors.WHITE_TEXT
+        )
+        self.chat_toggle.pack(side="right", padx=10)
 
         tk.Label(controls_frame, text="Competition:",
                  font=("Segoe UI", 11),
@@ -801,36 +819,43 @@ Shirt Number: {data.get('shirtNumber', 'N/A')}
         self.update_status(f"Loaded {len(data.get('matches', []))} matches")
 
     def send_udp_message(self):
-        """Gửi tin nhắn UDP và hiển thị phản hồi"""
+        """Mở cửa sổ chat"""
         try:
-            # Tạo UDP socket
-            udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-            # Chuẩn bị và gửi tin nhắn
-            message = "Hello My Friend!"
-            self.update_status(f"Gửi tin nhắn UDP: {message}")
-            udp_socket.sendto(message.encode(), ('127.0.0.1', 12345))
-
-            # Thiết lập timeout để tránh chờ mãi mãi
-            udp_socket.settimeout(5)
-
-            # Nhận phản hồi
-            try:
-                data, server = udp_socket.recvfrom(1024)
-                response = data.decode()
-                messagebox.showinfo("UDP Response", f"Phản hồi từ server: {response}")
-                self.update_status(f"UDP: Nhận phản hồi từ {server[0]}:{server[1]}")
-            except socket.timeout:
-                messagebox.showwarning("UDP Timeout", "Không nhận được phản hồi từ server UDP")
-                self.update_status("UDP: Timeout - không nhận được phản hồi")
+            # Import và mở cửa sổ chat
+            from chat_ui import ChatWindow
+            chat_window = ChatWindow(self, self.user_data.get('username', 'User'))
+            chat_window.protocol("WM_DELETE_WINDOW", chat_window.on_closing)
         except Exception as e:
-            messagebox.showerror("UDP Error", f"Lỗi khi gửi tin nhắn UDP: {str(e)}")
-            self.update_status(f"UDP Error: {str(e)}")
-        finally:
-            # Đóng socket
-            udp_socket.close()
+            messagebox.showerror("Chat Error", f"Không thể mở cửa sổ chat: {str(e)}")
+
+    def toggle_chat(self):
+        """Toggle chat window"""
+        if self.chat_enabled.get():
+            # Mở cửa sổ chat
+            if not self.chat_window:
+                try:
+                    from chat_ui import ChatWindow
+                    self.chat_window = ChatWindow(self, self.user_data.get('username', 'User'))
+                    self.chat_window.protocol("WM_DELETE_WINDOW", self.close_chat)
+                except Exception as e:
+                    messagebox.showerror("Chat Error", f"Không thể mở cửa sổ chat: {str(e)}")
+                    self.chat_enabled.set(False)
+        else:
+            # Đóng cửa sổ chat
+            self.close_chat()
+
+    def close_chat(self):
+        """Close chat window"""
+        if self.chat_window:
+            self.chat_window.on_closing()
+            self.chat_window = None
+        self.chat_enabled.set(False)
 
     def on_closing(self):
+        """Handle application closing"""
+        # Close chat window if open
+        self.close_chat()
+
         # Hủy tất cả các lệnh after() đang chờ
         for after_id in self.tk.eval('after info').split():
             self.after_cancel(after_id)
