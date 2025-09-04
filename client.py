@@ -62,6 +62,9 @@ class ModernFootballApp(tk.Tk):
         # Tự động gửi UDP message sau 2 giây
         self.after(2000, self.send_udp_message)
 
+        # Thêm dòng này để xử lý sự kiện đóng cửa sổ
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
     def create_header(self):
         """Create modern header"""
         header = tk.Frame(self, background=Colors.HEADER_BG, height=80)
@@ -827,6 +830,28 @@ Shirt Number: {data.get('shirtNumber', 'N/A')}
             # Đóng socket
             udp_socket.close()
 
+    def on_closing(self):
+        # Hủy tất cả các lệnh after() đang chờ
+        for after_id in self.tk.eval('after info').split():
+            self.after_cancel(after_id)
+
+        # Code hiện tại
+        try:
+            # Đóng kết nối TCP nếu có
+            if hasattr(self, 'client') and self.client:
+                try:
+                    self.client.shutdown(socket.SHUT_RDWR)
+                    self.client.close()
+                    print("TCP connection closed")
+                except Exception as e:
+                    print(f"Error closing TCP connection: {e}")
+
+            self.destroy()
+            print("Application terminated")
+        except Exception as e:
+            print(f"Error during shutdown: {e}")
+            self.destroy()
+
 
 if __name__ == "__main__":
     try:
@@ -843,6 +868,9 @@ if __name__ == "__main__":
 
             def on_login_success(self, user_data):
                 """Được gọi khi đăng nhập thành công"""
+                # Đóng cửa sổ đăng nhập trước khi mở cửa sổ chính
+                self.login_window.destroy()
+
                 # Khởi tạo ứng dụng chính với thông tin người dùng
                 self.main_app = ModernFootballApp(user_data)
                 self.main_app.mainloop()

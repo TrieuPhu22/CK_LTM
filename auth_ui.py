@@ -34,6 +34,9 @@ class LoginWindow(tk.Tk):
         # Tạo giao diện
         self.create_login_ui()
 
+        # Thêm dòng này để xử lý sự kiện đóng cửa sổ
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
     def create_login_ui(self):
         # Frame chính
         main_frame = tk.Frame(self, bg=Colors.MAIN_BG, padx=40, pady=40)
@@ -107,6 +110,13 @@ class LoginWindow(tk.Tk):
         self.withdraw()  # Ẩn cửa sổ đăng nhập
         register_window = RegisterWindow(self)
         register_window.mainloop()
+
+    def on_closing(self):
+        """Xử lý sự kiện đóng cửa sổ"""
+        self.destroy()
+        # Đảm bảo chương trình thoát hoàn toàn
+        import sys
+        sys.exit(0)
 
 
 class RegisterWindow(tk.Toplevel):
