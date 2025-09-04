@@ -1,3 +1,4 @@
+
 # ==================== MODERN THEME & COLORS ====================
 class ModernTheme:
     # Color Palette - Modern Football Theme
