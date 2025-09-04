@@ -34,8 +34,11 @@ COMPETITIONS = {
 
 
 class ModernFootballApp(tk.Tk):
-    def __init__(self):
+    def __init__(self, user_data=None):
         super().__init__()
+
+        # Lưu thông tin người dùng
+        self.user_data = user_data or {}
 
         # Window setup
         self.title("⚽ Football Hub - Modern Edition")
@@ -78,6 +81,18 @@ class ModernFootballApp(tk.Tk):
                  font=("Segoe UI", 12),
                  background=Colors.HEADER_BG,
                  foreground="#94a3b8").pack(side="left", padx=(10, 0))
+
+        # User info
+        if self.user_data:
+            user_frame = tk.Frame(header, background=Colors.HEADER_BG)
+            user_frame.pack(side="right", padx=10, pady=20)
+
+            user_label = tk.Label(user_frame,
+                                  text=f"👤 {self.user_data.get('full_name', 'User')}",
+                                  font=("Segoe UI", 11),
+                                  background=Colors.HEADER_BG,
+                                  foreground=Colors.WHITE_TEXT)
+            user_label.pack(side="right", padx=10)
 
         # Controls
         controls_frame = tk.Frame(header, background=Colors.HEADER_BG)
@@ -814,7 +829,39 @@ Shirt Number: {data.get('shirtNumber', 'N/A')}
 
 
 if __name__ == "__main__":
-    app = ModernFootballApp()
-    app.mainloop()
+    try:
+        # Import cửa sổ đăng nhập
+        from auth_ui import LoginWindow
+
+
+        # Tạo lớp quản lý ứng dụng tương tự như trong main.py
+        class FootballHubApp:
+            def __init__(self):
+                # Bắt đầu với cửa sổ đăng nhập
+                self.login_window = LoginWindow(self.on_login_success)
+                self.login_window.mainloop()
+
+            def on_login_success(self, user_data):
+                """Được gọi khi đăng nhập thành công"""
+                # Khởi tạo ứng dụng chính với thông tin người dùng
+                self.main_app = ModernFootballApp(user_data)
+                self.main_app.mainloop()
+
+
+        # Khởi chạy ứng dụng với cửa sổ đăng nhập
+        app = FootballHubApp()
+
+    except ImportError:
+        # Nếu không tìm thấy module auth_ui, chạy trực tiếp ứng dụng chính
+        print("Warning: Running without authentication")
+        app = ModernFootballApp()
+        app.mainloop()
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+
+        traceback.print_exc()
+        app = ModernFootballApp()  # Fallback nếu có lỗi
+        app.mainloop()
 
 
