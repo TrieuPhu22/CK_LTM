@@ -21,10 +21,21 @@ Tôi đã cải thiện hoàn toàn giao diện người dùng của đồ án L
 - **Visual feedback**: Status updates và loading states
 
 ### ⚡ **Tính năng mới**
+- **Authentication system**: Đăng nhập/Đăng ký người dùng với SQLite
 - **Enhanced filters**: Bộ lọc nâng cao cho matches
 - **Better data display**: Bảng dữ liệu với scrollbars và responsive columns
 - **Improved error handling**: Thông báo lỗi user-friendly
 - **Real-time status**: Hiển thị trạng thái kết nối server
+- **UDP Communication**: Hỗ trợ giao thức UDP cho tin nhắn đơn giản
+
+## 🗂️ Cấu trúc dự án
+
+- **main.py**: Entry point của ứng dụng, quản lý luồng đăng nhập và khởi chạy app
+- **client.py**: Giao diện người dùng chính và xử lý dữ liệu
+- **server.py**: Server xử lý API requests và giao tiếp TCP/UDP
+- **auth_ui.py**: Giao diện đăng nhập và đăng ký
+- **database.py**: Quản lý cơ sở dữ liệu SQLite cho người dùng
+- **modern_theme.py**: Định nghĩa theme và màu sắc cho ứng dụng
 
 ## 🚀 Cách chạy ứng dụng
 
@@ -35,8 +46,15 @@ python server.py
 
 ### Bước 2: Chạy Client
 ```bash
-python client.py
+python main.py
 ```
+
+## 🔐 Hệ thống xác thực
+
+- **Đăng nhập**: Nhập username và mật khẩu để truy cập vào ứng dụng
+- **Đăng ký**: Tạo tài khoản mới với thông tin cá nhân
+- **Bảo mật**: Mật khẩu được mã hóa bằng SHA-256
+- **Cơ sở dữ liệu**: SQLite lưu trữ thông tin người dùng
 
 ## 📸 Giao diện mới
 
@@ -45,6 +63,7 @@ python client.py
 - Subtitle "Real-time Football Data & Analytics"
 - Competition selector và Refresh button
 - Sidebar navigation với 5 tabs chính
+- Hiển thị thông tin người dùng đã đăng nhập
 
 ### 📅 **Tab Matches**
 - **Match Filters Card**:
@@ -52,7 +71,7 @@ python client.py
   - Status filter (All, Live, Finished, Scheduled)
   - Load Matches button
 - **Match Results Table**:
-  - Columns: Date, Time, Home Team, Score, Away Team, Status
+  - Columns: Date, Time, Home Team, Score, Away Team, Status, League
   - Scrollable với nhiều trận đấu
   - Icons cho trạng thái (✅ Finished, 🔴 LIVE, ⏰ Scheduled)
 
@@ -86,6 +105,7 @@ python client.py
 ### 📊 **Status Bar**
 - **Connection status**: 🟢 Connected / 🔴 Disconnected
 - **Current action status**: Loading messages, ready state
+- **UDP Button**: Gửi tin nhắn qua UDP protocol
 
 ## 🎨 Color Scheme
 
@@ -119,12 +139,19 @@ HEADER_BG = "#0f172a"    # Darker Blue - Header
 - Efficient data loading
 - Minimal UI updates
 - Proper memory management
+- Socket shutdown handling
 
 ### **Maintainability**
 - Modular design
 - Easy to extend
 - Clear documentation
 - Consistent styling
+
+### **Networking**
+- TCP for main data communication
+- UDP for simple message exchange
+- Socket exception handling
+- Proper connection closure
 
 ## 🆚 So sánh với phiên bản cũ
 
@@ -137,6 +164,8 @@ HEADER_BG = "#0f172a"    # Darker Blue - Header
 | **Typography** | Default font | Segoe UI with sizes |
 | **Feedback** | Minimal | Status bar + messages |
 | **Responsiveness** | Fixed | Flexible and responsive |
+| **Authentication** | None | Login/Register with SQLite |
+| **Protocols** | TCP only | TCP and UDP |
 
 ## 🎯 Điểm nổi bật cho đồ án
 
@@ -147,8 +176,11 @@ HEADER_BG = "#0f172a"    # Darker Blue - Header
 - ✅ API integration
 - ✅ Error handling và exception management
 - ✅ Modern UI/UX design
+- ✅ Database integration (SQLite)
+- ✅ Multiple protocol support (TCP/UDP)
 
 ### **Chức năng nghiệp vụ**
+- ✅ User authentication và management
 - ✅ Real-time football data
 - ✅ Multiple competition support
 - ✅ Comprehensive data display
@@ -161,10 +193,11 @@ HEADER_BG = "#0f172a"    # Darker Blue - Header
 - ✅ Responsive layout
 - ✅ Visual feedback
 - ✅ Error handling
+- ✅ User-friendly authentication forms
 
 ## 🚀 Hướng phát triển tiếp theo
 
-1. **Database Integration**: SQLite cho caching data
+1. **Enhanced Database**: Mở rộng SQLite cho caching match data
 2. **Real-time Updates**: WebSocket cho live scores
 3. **Favorites System**: Lưu teams và players yêu thích
 4. **Export Features**: Xuất data ra Excel/PDF
@@ -177,6 +210,6 @@ HEADER_BG = "#0f172a"    # Darker Blue - Header
 
 - Đảm bảo server đang chạy trước khi chạy client
 - Cần internet connection để truy cập football API
-- Tất cả tính năng cũ đều được giữ nguyên và cải thiện
-
-
+- Cửa sổ đăng nhập sẽ xuất hiện trước khi vào ứng dụng chính
+- Sử dụng `python main.py` thay vì `python client.py` để khởi động đúng ứng dụng
+- Tất cả tính năng cũ đều được giữ nguyên
